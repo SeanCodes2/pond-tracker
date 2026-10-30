@@ -8,6 +8,7 @@ import { usePonds } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
 import { catchesToCsv, downloadBlob } from '../lib/csv';
 import { formatBytes } from '../lib/format';
+import { checkForUpdate, hardRefresh } from '../lib/appUpdate';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -119,9 +120,8 @@ export function SettingsPage() {
         <h2>Records</h2>
         <RecordsCard />
 
-        <div className="muted" style={{ fontSize: 13, marginTop: 24, textAlign: 'center' }}>
-          Build {__BUILD__}
-        </div>
+        <h2>App version</h2>
+        <UpdateCard />
       </div>
     </div>
   );
@@ -242,4 +242,35 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'pond';
+}
+
+function UpdateCard() {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    const r = await checkForUpdate();
+    setBusy(false);
+    const msg = {
+      updating: 'Update found — reloading…',
+      current: 'You have the latest version',
+      unsupported: 'Updates are not available in this browser',
+      failed: 'Could not reach the server — try again with a connection',
+    }[r];
+    toast.show({ message: msg });
+  };
+  const force = () => {
+    if (window.confirm('Reload the app from the server? Your catches stay on this phone.')) void hardRefresh();
+  };
+  return (
+    <div className="card stack">
+      <div className="muted">Build {__BUILD__}</div>
+      <button type="button" className="btn" disabled={busy} onClick={() => void check()}>
+        {busy ? 'Checking…' : 'Check for updates'}
+      </button>
+      <button type="button" className="btn" onClick={force}>
+        Force reload
+      </button>
+    </div>
+  );
 }
