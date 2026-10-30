@@ -118,6 +118,10 @@ export function SettingsPage() {
 
         <h2>Records</h2>
         <RecordsCard />
+
+        <div className="muted" style={{ fontSize: 13, marginTop: 24, textAlign: 'center' }}>
+          Build {__BUILD__}
+        </div>
       </div>
     </div>
   );

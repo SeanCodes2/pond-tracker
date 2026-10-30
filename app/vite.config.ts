@@ -7,7 +7,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 // works on a fresh clone without building shared/dist first, and edits hot-reload.
 const sharedSrc = fileURLToPath(new URL('../shared/src/index.ts', import.meta.url));
 
+// Build stamp shown in Settings, so it's obvious which version the installed app is running.
+const buildStamp = `${process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev'} · ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+
 export default defineConfig({
+  define: {
+    __BUILD__: JSON.stringify(buildStamp),
+  },
   resolve: {
     alias: { '@pond-tracker/shared': sharedSrc },
   },
