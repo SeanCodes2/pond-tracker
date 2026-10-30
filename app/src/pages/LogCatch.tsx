@@ -16,6 +16,7 @@ import {
   isEntryValid,
   loadLastLength,
   saveLastLength,
+  WEIGHT_CAP_LB,
   weightRange,
 } from '../features/log/entryReducer';
 import { PondChip } from '../features/log/PondChip';
@@ -170,8 +171,10 @@ export function LogCatch() {
         }
         step={weightStep}
         sliderStep={lbsOz ? OZ_LB : 0.05}
-        min={Math.min(wRange.min, state.weightLb)}
-        max={Math.max(wRange.max, state.weightLb)}
+        min={weightStep}
+        max={WEIGHT_CAP_LB[state.species]}
+        sliderMin={wRange.min}
+        sliderMax={wRange.max}
         onChange={(weightLb) => dispatch({ type: 'weight', weightLb, step: weightStep })}
       />
 

@@ -18,7 +18,7 @@ export const WEIGHT_MIN_LB = 0;
 /** Hard ceilings per species — comfortably above state-record fish (Kansas LMB record is 11.8 lb). */
 export const WEIGHT_CAP_LB: Record<SpeciesCode, number> = { LMB: 13, BLG: 4, RES: 5 };
 
-/** The weight slider/stepper spans relative weight 50–160 for the current length. */
+/** The weight slider spans relative weight 50–160 for the current length (the +/- buttons go further, up to the species cap). */
 const WR_RANGE = { min: 0.5, max: 1.6 };
 
 export function weightRange(species: SpeciesCode, lengthIn: number, weightStep = 0.05): { min: number; max: number } {

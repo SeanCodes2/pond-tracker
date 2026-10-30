@@ -11,6 +11,9 @@ interface StepperProps {
   max: number;
   /** Range slider granularity (defaults to step). */
   sliderStep?: number;
+  /** Slider range when narrower than the button range (defaults to min/max). */
+  sliderMin?: number;
+  sliderMax?: number;
   /** Show the readout dimmed (a suggested value the user hasn't confirmed). */
   dim?: boolean;
   /** Makes the readout a button, e.g. to confirm a suggested value. */
@@ -19,8 +22,25 @@ interface StepperProps {
 }
 
 /** Big readout + full-width –/+ halves + a range slider for jumps. */
-export function Stepper({ label, value, readout, sub, step, min, max, sliderStep, dim, onReadoutClick, onChange }: StepperProps) {
+export function Stepper({
+  label,
+  value,
+  readout,
+  sub,
+  step,
+  min,
+  max,
+  sliderStep,
+  sliderMin,
+  sliderMax,
+  dim,
+  onReadoutClick,
+  onChange,
+}: StepperProps) {
   const set = (v: number) => onChange(clamp(roundToStep(v, step), min, max));
+  // The slider never pins the value: its range stretches to include wherever the buttons put it.
+  const sMin = Math.min(sliderMin ?? min, value);
+  const sMax = Math.max(sliderMax ?? max, value);
   return (
     <div className="stepper">
       <div className="stepper-head">
@@ -52,8 +72,8 @@ export function Stepper({ label, value, readout, sub, step, min, max, sliderStep
       <input
         type="range"
         aria-label={`${label} slider`}
-        min={min}
-        max={max}
+        min={sMin}
+        max={sMax}
         step={sliderStep ?? step}
         value={value}
         onChange={(e) => set(Number(e.target.value))}
