@@ -150,7 +150,7 @@ export function createRepo(database: PondTrackerDB) {
   async function saveSettings(patch: Partial<Omit<Settings, 'id'>>): Promise<Settings> {
     const current = await getSettings();
     const next: Settings = { ...current, ...patch, id: 'settings', updatedAt: now() };
-    await database.settings.put(next);
+    await database.settings.put({ ...next, pending: 1 });
     return next;
   }
 
@@ -165,6 +165,7 @@ export function createRepo(database: PondTrackerDB) {
       width: resized.width,
       height: resized.height,
       bytes: resized.blob.size,
+      updatedAt: now(),
       pending: 1,
     };
     await database.transaction('rw', database.photos, database.catches, async () => {

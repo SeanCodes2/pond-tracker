@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { initDb } from './db/db';
 import { repo } from './db/repo';
+import { startSync } from './sync/startSync';
 import './styles.css';
 
 // autoUpdate: a new build activates and the page reloads itself. Browsers only re-check on a
@@ -22,7 +23,12 @@ registerSW({
   },
 });
 // Seed settings, then sweep soft-deleted rows older than 30 days (the "Recently deleted" window).
-void initDb().then(() => repo.purgeDeleted(30)).catch(() => undefined);
+// Then start cloud sync (no-op in local dev unless localStorage['pt:forceSync'] === '1').
+void initDb()
+  .then(() => repo.purgeDeleted(30))
+  .catch(() => undefined)
+  .then(() => startSync())
+  .catch(() => undefined);
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Missing #root');

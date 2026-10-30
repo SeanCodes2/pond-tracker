@@ -26,3 +26,6 @@ api/.azure/
 
 # agent scratch
 .scratch/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

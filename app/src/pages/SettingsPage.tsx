@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import type { Settings, WeightUnits } from '@pond-tracker/shared';
@@ -9,6 +9,9 @@ import { useSettings } from '../hooks/useSettings';
 import { catchesToCsv, downloadBlob } from '../lib/csv';
 import { formatBytes } from '../lib/format';
 import { checkForUpdate, hardRefresh } from '../lib/appUpdate';
+import { db } from '../db/db';
+import { SYNC_STATE_ID, countPending, syncNow } from '../sync/sync';
+import { syncEnabled } from '../sync/startSync';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -45,6 +48,9 @@ export function SettingsPage() {
     <div className="page">
       <h1>Settings</h1>
       <div className="form">
+        <h2>Cloud sync</h2>
+        <SyncCard />
+
         <div className="field">
           <label htmlFor="units">Weight units</label>
           <select id="units" value={settings.weightUnits} onChange={(e) => patch({ weightUnits: e.target.value as WeightUnits })}>
@@ -75,7 +81,7 @@ export function SettingsPage() {
 
         <Toggle label="Require weight" hint="Save is disabled until a weight is entered" checked={settings.requireWeight} onChange={(v) => patch({ requireWeight: v })} />
         <Toggle label="Require photo" hint="Save is disabled until a photo is attached" checked={settings.requirePhoto} onChange={(v) => patch({ requirePhoto: v })} />
-        <Toggle label="Wi-Fi only photo sync" hint="Applies once cloud sync exists" checked={settings.wifiOnlyPhotoSync} onChange={(v) => patch({ wifiOnlyPhotoSync: v })} />
+        <Toggle label="Wi-Fi only photo sync" hint="Photos wait for Wi-Fi before uploading; records still sync on cellular" checked={settings.wifiOnlyPhotoSync} onChange={(v) => patch({ wifiOnlyPhotoSync: v })} />
 
         <h2>Defaults for new ponds</h2>
         <div className="field-grid three">
@@ -111,7 +117,7 @@ export function SettingsPage() {
             : 'Storage estimate unavailable'}
         </div>
         <div className="muted" style={{ fontSize: 14 }}>
-          All data lives in this browser's IndexedDB on this phone. Export CSV regularly until cloud sync exists.
+          Data is stored on this phone and backed up to the cloud when sync runs.
         </div>
 
         <h2>Sample data</h2>
@@ -125,6 +131,70 @@ export function SettingsPage() {
       </div>
     </div>
   );
+}
+
+function SyncCard() {
+  const toast = useToast();
+  const state = useLiveQuery(() => db.syncState.get(SYNC_STATE_ID), []);
+  const pending = useLiveQuery(() => countPending(), []);
+  const [busy, setBusy] = useState(false);
+  // Re-render every 30 s so "Synced 2 min ago" stays current.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const enabled = syncEnabled();
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await syncNow();
+      if (r.status === 'ok') toast.show({ message: r.pushed || r.pulled ? `Synced · sent ${r.pushed}, received ${r.pulled}` : 'Up to date' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  let status: ReactNode;
+  if (!enabled) status = 'Sync is off in local development';
+  else if (busy) status = 'Syncing…';
+  else if (state?.lastStatus === 'signed-out')
+    status = <a href="/login.html">Sign in to sync</a>;
+  else if (state?.lastStatus === 'offline' || (typeof navigator !== 'undefined' && !navigator.onLine))
+    status = 'Offline — will sync when connected';
+  else if (state?.lastStatus === 'error') status = `Last sync failed: ${state.lastError ?? 'unknown error'}`;
+  else if (state?.photosWaitingForWifi)
+    status = `Waiting for Wi-Fi to upload ${state.photosWaitingForWifi} ${state.photosWaitingForWifi === 1 ? 'photo' : 'photos'}`;
+  else if (state?.lastSyncAt) status = `Synced ${timeAgo(state.lastSyncAt)}`;
+  else status = 'Not synced yet';
+
+  const records = pending?.records ?? 0;
+  const photos = pending?.photos ?? 0;
+  return (
+    <div className="card stack">
+      <div>{status}</div>
+      <div className="muted" style={{ fontSize: 14 }}>
+        {pending === undefined
+          ? 'Counting…'
+          : records + photos === 0
+            ? 'Everything on this phone is backed up'
+            : `Waiting to sync: ${records} ${records === 1 ? 'record' : 'records'} · ${photos} ${photos === 1 ? 'photo' : 'photos'}`}
+      </div>
+      <button type="button" className="btn" disabled={!enabled || busy} onClick={() => void run()}>
+        {busy ? 'Syncing…' : 'Sync now'}
+      </button>
+    </div>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const mins = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} h ago`;
+  return `on ${new Date(iso).toLocaleDateString()}`;
 }
 
 function RecordsCard() {
