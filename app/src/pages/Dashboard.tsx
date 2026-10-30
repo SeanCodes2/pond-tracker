@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useParams } from 'react-router-dom';
 import type { SpeciesCode, WrThresholds } from '@pond-tracker/shared';
@@ -73,7 +74,31 @@ export function Dashboard() {
 
         {present.length ? (
           <div className="card">
-            <h3>Mean Wr by length class</h3>
+            <h3>Condition by size</h3>
+            <div className="muted chart-caption">
+              Average relative weight (Wr) of the fish you've logged in each size group. 100 = normal weight for its length.
+            </div>
+            <Explain>
+              <p>
+                <b>Wr</b> compares a fish's weight to the standard weight for its length. 100 is normal; below 85 is thin
+                (not enough food for that size group); 95–110 is good; above 110 is fat.
+              </p>
+              <p>
+                <b>Size groups</b> are the standard fisheries length classes. For bass: stock {SPECIES.LMB.stockIn}–
+                {SPECIES.LMB.qualityIn} in, quality {SPECIES.LMB.qualityIn}–{SPECIES.LMB.preferredIn} in, preferred{' '}
+                {SPECIES.LMB.preferredIn}–{SPECIES.LMB.memorableIn} in, memorable {SPECIES.LMB.memorableIn}+ in. For
+                bluegill: {SPECIES.BLG.stockIn}–{SPECIES.BLG.qualityIn}, {SPECIES.BLG.qualityIn}–{SPECIES.BLG.preferredIn},{' '}
+                {SPECIES.BLG.preferredIn}–{SPECIES.BLG.memorableIn} and {SPECIES.BLG.memorableIn}+ in.
+              </p>
+              <p>
+                <b>"17 fish"</b> under a bar is how many catches that average is based on. Treat bars with only a few fish
+                as rough.
+              </p>
+              <p>
+                <b>Reading it:</b> thin small bass with healthy big bass usually means too many small bass competing for
+                food — harvest more of them. Thin bass across every size means food is short overall.
+              </p>
+            </Explain>
             {present.map((code) => (
               <WrClassChart key={code} code={code} catches={bySpecies(code)} thresholds={thresholds} />
             ))}
@@ -82,7 +107,20 @@ export function Dashboard() {
 
         {present.length ? (
           <div className="card">
-            <h3>Length frequency</h3>
+            <h3>Sizes caught</h3>
+            <div className="muted chart-caption">How many fish you've logged at each inch of length.</div>
+            <Explain>
+              <p>Each bar is a 1-inch bucket: the bar at 12 counts fish from 12 up to (not including) 13 in.</p>
+              <p>
+                <b>S, Q, P</b> are the start of each size group: S = stock, Q = quality, P = preferred (bass{' '}
+                {SPECIES.LMB.stockIn} / {SPECIES.LMB.qualityIn} / {SPECIES.LMB.preferredIn} in, bluegill{' '}
+                {SPECIES.BLG.stockIn} / {SPECIES.BLG.qualityIn} / {SPECIES.BLG.preferredIn} in).
+              </p>
+              <p>
+                The <b>shaded band</b> on the bass chart is your harvest range. A big pile of bars inside it and few to the
+                right means the pond is stacked with mid-size bass that aren't moving up.
+              </p>
+            </Explain>
             {present.map((code) => (
               <LengthChart key={code} code={code} catches={bySpecies(code)} pond={pond} />
             ))}
@@ -91,15 +129,40 @@ export function Dashboard() {
 
         {present.length ? (
           <div className="card">
-            <h3>Wr by month</h3>
-            <div className="muted chart-caption">{year} season · shaded when the feeder was running</div>
+            <h3>Condition through the season</h3>
+            <div className="muted chart-caption">Average Wr per month, {year}. Shaded = feeder running.</div>
+            <Explain>
+              <p>
+                Each dot is the average Wr of everything of that species you logged that month; the number at the end is
+                the latest month. The dashed line is your "good" threshold ({thresholds.ok}).
+              </p>
+              <p>
+                Bluegill rising while the feeder is on means the feed is reaching them. Bass following a month or two later
+                means the bluegill are doing their job as bass food. Log your feeder on the Feeder tab to get the shading.
+              </p>
+            </Explain>
             <WrByMonthChart catches={catches.filter((c) => c.caughtAt >= seasonStart)} species={present} feedingLogs={feedingLogs ?? []} year={year} thresholds={thresholds} />
           </div>
         ) : null}
 
         {present.length ? (
           <div className="card">
-            <h3>Size structure (PSD)</h3>
+            <h3>Size balance (PSD)</h3>
+            <div className="muted chart-caption">Of the fish big enough to count, the percent that are decent size.</div>
+            <Explain>
+              <p>
+                <b>PSD</b> (proportional stock density) = quality-size fish ÷ stock-size fish × 100. For bass that's the
+                share of {SPECIES.LMB.stockIn}+ in fish that are {SPECIES.LMB.qualityIn}+ in; for bluegill, the share of{' '}
+                {SPECIES.BLG.stockIn}+ in fish that are {SPECIES.BLG.qualityIn}+ in.
+              </p>
+              <p>
+                The <b>shaded band</b> is the usual balanced range (bass {PSD_BALANCED.LMB[0]}–{PSD_BALANCED.LMB[1]},
+                bluegill {PSD_BALANCED.BLG[0]}–{PSD_BALANCED.BLG[1]}). Low bass PSD = lots of small bass, few bigger ones.
+                A big-bass pond tends to run bass PSD high and bluegill PSD lower, because the bass keep the bluegill
+                numbers down.
+              </p>
+              <p>It needs a few dozen fish before the number settles down.</p>
+            </Explain>
             {present.map((code) => (
               <PsdReadout key={code} code={code} catches={bySpecies(code)} />
             ))}
@@ -153,7 +216,7 @@ function StatsCard({ code, catches, seasonStart }: SpeciesProps & { seasonStart:
         <Stat v={count(season, 'released')} l="Released this season" />
         <Stat v={count(catches, 'kept')} l="Kept all time" />
         <Stat v={count(catches, 'released')} l="Released all time" />
-        <Stat v={p.psd === null ? '—' : Math.round(p.psd)} l={`PSD (${p.nQuality}/${p.nStock} stock)`} />
+        <Stat v={p.psd === null ? '—' : Math.round(p.psd)} l="Size balance (PSD)" />
         <Stat v={catches.length} l="Logged" />
       </div>
     </div>
@@ -174,9 +237,9 @@ function WrClassChart({ code, catches, thresholds }: SpeciesProps & { thresholds
         refBand={{ from: thresholds.ok, to: thresholds.high, label: `good ${thresholds.ok}–${thresholds.high}` }}
         refLine={{ value: thresholds.low, label: `low ${thresholds.low}` }}
         categories={classes.map((c) => ({
-          label: c.cls,
+          label: classRange(c.cls, s),
           value: c.meanWr,
-          sub: `n ${c.n}`,
+          sub: `${c.n} fish`,
           colorClass: c.meanWr === null ? undefined : wrBand(c.meanWr, thresholds),
           title: `${c.cls} (${cut[c.cls]}+ in): ${c.meanWr === null ? 'no fish' : `Wr ${Math.round(c.meanWr)}, n ${c.n}`}`,
         }))}
@@ -294,6 +357,30 @@ function PsdReadout({ code, catches }: SpeciesProps) {
         {p.nQuality} of {p.nStock} stock-size fish ({s.stockIn}+ in) are quality size ({s.qualityIn}+ in) · balanced {band[0]}–{band[1]}
       </div>
     </div>
+  );
+}
+
+/** "8–12 in" for a length class (open-ended for the top class). */
+function classRange(cls: 'stock' | 'quality' | 'preferred' | 'memorable', s: (typeof SPECIES)[SpeciesCode]): string {
+  switch (cls) {
+    case 'stock':
+      return `${s.stockIn}–${s.qualityIn} in`;
+    case 'quality':
+      return `${s.qualityIn}–${s.preferredIn} in`;
+    case 'preferred':
+      return `${s.preferredIn}–${s.memorableIn} in`;
+    case 'memorable':
+      return `${s.memorableIn}+ in`;
+  }
+}
+
+/** Collapsed "what does this mean?" explainer under a chart heading. */
+function Explain({ children }: { children: ReactNode }) {
+  return (
+    <details className="explain">
+      <summary>What does this mean?</summary>
+      <div className="explain-body">{children}</div>
+    </details>
   );
 }
 

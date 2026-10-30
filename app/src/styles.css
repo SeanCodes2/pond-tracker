@@ -958,7 +958,6 @@ a {
 .chart .chart-cat {
   font-size: 12px;
   font-weight: 600;
-  text-transform: capitalize;
 }
 
 .chart .chart-value {
@@ -1350,4 +1349,39 @@ a {
 input[type='time'] {
   color: var(--text);
   color-scheme: light dark;
+}
+
+/* ---- dashboard explainers ---- */
+.explain {
+  margin: 4px 0 12px;
+}
+.explain summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+  list-style: none;
+}
+.explain summary::-webkit-details-marker {
+  display: none;
+}
+.explain summary::before {
+  content: 'ⓘ';
+  margin-right: 6px;
+  font-size: 18px;
+}
+.explain[open] summary::before {
+  content: '×';
+}
+.explain-body {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 4px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.explain-body p {
+  margin: 10px 0;
 }
