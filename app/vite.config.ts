@@ -41,7 +41,13 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Don't precache the gate pages: they must always come from the server.
+        globIgnores: ['**/login.html', '**/denied.html'],
         navigateFallback: '/index.html',
+        // Navigations to sign-in/out, the API and the gate pages must reach the network.
+        // Without this the SW answers /.auth/login/aad with the cached app shell and
+        // the Sign in button appears to do nothing in the installed app.
+        navigateFallbackDenylist: [/^\/\.auth\//, /^\/api\//, /^\/login(\.html)?$/, /^\/logout$/, /^\/denied\.html$/],
       },
     }),
   ],
