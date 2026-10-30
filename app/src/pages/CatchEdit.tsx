@@ -12,6 +12,7 @@ import { usePhotoUrl } from '../hooks/usePhotoUrl';
 import { usePond, usePonds } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
 import { fromLocalInput, toLocalInput } from '../lib/format';
+import { shareCatchPhoto } from '../lib/sharePhoto';
 import type { CatchPrefill } from '../features/log/entryReducer';
 
 interface Draft {
@@ -118,6 +119,15 @@ export function CatchEdit() {
     navigate('/', { state: { prefill } });
   };
 
+  const onShare = async () => {
+    try {
+      const r = await shareCatchPhoto(row, { pondName: pond?.name, units: settings.weightUnits });
+      if (r === 'downloaded') toast.show({ message: 'Photo downloaded.' });
+    } catch {
+      toast.show({ message: 'Could not share that photo. Check your connection and try again.' });
+    }
+  };
+
   const onPhoto = async (file: File) => {
     try {
       await repo.savePhoto(row.id, file);
@@ -134,9 +144,14 @@ export function CatchEdit() {
         <div className="row">
           <PhotoInput className="btn block" onPick={(f) => void onPhoto(f)} aria-label={photoUrl ? 'Retake photo' : 'Add photo'}>
             <span ref={cameraBtn} className="row" style={{ gap: 8 }}>
-              <CameraIcon /> {photoUrl ? 'Retake photo' : 'Add photo'}
+              <CameraIcon /> {photoUrl ? 'Retake' : 'Add photo'}
             </span>
           </PhotoInput>
+          {photoUrl ? (
+            <button type="button" className="btn" onClick={() => void onShare()}>
+              <ShareIcon /> Share
+            </button>
+          ) : null}
           {photoUrl ? (
             <button type="button" className="btn danger" onClick={() => void repo.deletePhoto(row.id)}>
               Remove
@@ -225,5 +240,14 @@ export function CatchEdit() {
         </button>
       </form>
     </div>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3v12M7 8l5-5 5 5" />
+      <path d="M5 13v6h14v-6" />
+    </svg>
   );
 }
