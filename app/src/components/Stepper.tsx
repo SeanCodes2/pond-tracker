@@ -19,6 +19,7 @@ interface StepperProps {
   /** Makes the readout a button, e.g. to confirm a suggested value. */
   onReadoutClick?: () => void;
   onChange: (v: number) => void;
+  className?: string;
 }
 
 /** Big readout + full-width –/+ halves + a range slider for jumps. */
@@ -36,15 +37,20 @@ export function Stepper({
   dim,
   onReadoutClick,
   onChange,
+  className,
 }: StepperProps) {
   const set = (v: number) => onChange(clamp(roundToStep(v, step), min, max));
   // The slider never pins the value: its range stretches to include wherever the buttons put it.
   const sMin = Math.min(sliderMin ?? min, value);
   const sMax = Math.max(sliderMax ?? max, value);
   return (
-    <div className="stepper">
+    <div className={`stepper${className ? ` ${className}` : ''}`}>
       <div className="stepper-head">
-        <div className="stepper-label">{label}</div>
+        {/* Label and sub-line share the readout's row so the card stays short. */}
+        <div className="stepper-meta">
+          <div className="stepper-label">{label}</div>
+          {sub ? <div className="stepper-sub">{sub}</div> : null}
+        </div>
         {onReadoutClick ? (
           <button
             type="button"
@@ -60,7 +66,6 @@ export function Stepper({
           </div>
         )}
       </div>
-      <div className="stepper-sub">{sub}</div>
       <div className="stepper-buttons">
         <button type="button" aria-label={`Decrease ${label}`} onClick={() => set(value - step)} disabled={value <= min}>
           –

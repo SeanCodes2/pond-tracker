@@ -300,10 +300,17 @@ a {
 
 .stepper-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.stepper-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .stepper-label {
@@ -349,10 +356,9 @@ a {
 }
 
 .stepper-sub {
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.25;
   color: var(--text-muted);
-  min-height: 20px;
-  margin-bottom: 8px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -363,7 +369,7 @@ a {
 
 .stepper-buttons button {
   flex: 1;
-  min-height: 60px;
+  min-height: 56px;
   border-radius: 12px;
   background: var(--surface-2);
   font-size: 34px;
@@ -377,8 +383,8 @@ a {
 
 .stepper input[type='range'] {
   width: 100%;
-  margin: 12px 0 0;
-  height: 44px;
+  margin: 6px 0 0;
+  height: 40px;
   accent-color: var(--accent);
 }
 
@@ -470,6 +476,109 @@ a {
   background: var(--wr-excellent);
 }
 
+/* ---------- log page ---------- */
+/* One screen, no scrolling: the page is exactly the space above the tab bar, and any
+   spare height goes above the controls so they stay at the bottom, near the thumb. */
+.log-page {
+  height: 100dvh;
+  min-height: 0;
+  flex: none;
+  gap: 10px;
+  overflow-y: auto;
+  padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px);
+}
+
+.log-page .first-control {
+  margin-top: auto;
+}
+
+.log-page .chip {
+  min-height: 44px;
+}
+
+.log-page .wr-gauge {
+  padding: 10px 14px;
+}
+
+/* Short screens (small phones, or a browser with its toolbars showing). */
+@media (max-height: 760px) {
+  .log-page .wr-gauge .wr-num {
+    font-size: 44px;
+  }
+  .log-page .wr-gauge .wr-hint {
+    font-size: 16px;
+  }
+  .log-page .stepper-readout,
+  .log-page .stepper-readout.as-button {
+    font-size: 38px;
+  }
+  .log-page .stepper-buttons button {
+    min-height: 50px;
+  }
+  .log-page .stepper input[type='range'] {
+    height: 32px;
+    margin-top: 4px;
+  }
+  .log-page .btn.save {
+    min-height: 58px;
+  }
+}
+
+/* Very short screens (iPhone SE class): squeeze a little harder rather than scroll. */
+@media (max-height: 700px) {
+  .log-page {
+    gap: 8px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+  }
+  .log-page .chip {
+    min-height: 40px;
+  }
+  .log-page .wr-gauge {
+    padding: 8px 12px;
+  }
+  .log-page .wr-gauge .wr-num {
+    font-size: 38px;
+  }
+  .log-page .wr-gauge .wr-band {
+    font-size: 13px;
+  }
+  .log-page .wr-gauge .wr-hint {
+    font-size: 15px;
+  }
+  .log-page .stepper {
+    padding: 8px 10px 8px;
+  }
+  .log-page .stepper-head {
+    margin-bottom: 6px;
+  }
+  .log-page .stepper-readout,
+  .log-page .stepper-readout.as-button {
+    font-size: 34px;
+  }
+  .log-page .stepper-readout.as-button {
+    min-height: 48px;
+    padding: 4px 8px;
+  }
+  .log-page .stepper-sub {
+    font-size: 13px;
+  }
+  .log-page .stepper-buttons button {
+    min-height: 46px;
+    font-size: 30px;
+  }
+  .log-page .stepper input[type='range'] {
+    height: 28px;
+    margin-top: 2px;
+  }
+  .log-page .segmented button {
+    min-height: 42px;
+  }
+  .log-page .btn.save,
+  .log-page .save-row .btn.icon {
+    min-height: 54px;
+  }
+}
+
 /* ---------- save row ---------- */
 .save-row {
   display: flex;
@@ -478,6 +587,55 @@ a {
 
 .save-row .btn.save {
   flex: 1;
+}
+
+.save-row .btn.icon {
+  min-height: 64px;
+}
+
+.photo-slot {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+
+.photo-slot .photo-thumb {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.photo-slot .photo-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Small badge, but the tap area is padded out to a usable size. */
+.photo-remove {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 0;
+}
+
+.photo-remove::before {
+  content: '×';
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 24px;
+  text-align: center;
 }
 
 /* ---------- toast ---------- */

@@ -130,19 +130,8 @@ export function LogCatch() {
       {/* Read-only results up top; every control sits in the lower half, within thumb reach. */}
       <WrGauge wr={wr} band={band} hint={gaugeHint} />
 
-      {state.photo ? (
-        <div className="photo-strip">
-          <PhotoThumb file={state.photo} />
-          <div className="main" style={{ flex: 1 }}>
-            Photo attached
-          </div>
-          <button type="button" className="btn" onClick={() => dispatch({ type: 'photo', photo: null })}>
-            Remove
-          </button>
-        </div>
-      ) : null}
-
       <Stepper
+        className="first-control"
         label="Length"
         value={state.lengthIn}
         readout={
@@ -181,13 +170,30 @@ export function LogCatch() {
       <SpeciesPicker value={state.species} onChange={(species) => dispatch({ type: 'species', species, weightStep })} />
 
       <div className="save-row">
-        <PhotoInput
-          className="btn icon"
-          aria-label="Take photo"
-          onPick={(photo) => dispatch({ type: 'photo', photo })}
-        >
-          <CameraIcon />
-        </PhotoInput>
+        {/* The photo lives in its slot here, so attaching one never changes the page height. */}
+        {state.photo ? (
+          <div className="photo-slot">
+            <PhotoInput
+              className="btn icon photo-thumb"
+              aria-label="Retake photo"
+              onPick={(photo) => dispatch({ type: 'photo', photo })}
+            >
+              <PhotoThumb file={state.photo} />
+            </PhotoInput>
+            <button
+              type="button"
+              className="photo-remove"
+              aria-label="Remove photo"
+              onClick={() => dispatch({ type: 'photo', photo: null })}
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <PhotoInput className="btn icon" aria-label="Take photo" onPick={(photo) => dispatch({ type: 'photo', photo })}>
+            <CameraIcon />
+          </PhotoInput>
+        )}
         <button type="button" className="btn save kept" disabled={!valid} onClick={() => void save('kept')}>
           Kept
         </button>
