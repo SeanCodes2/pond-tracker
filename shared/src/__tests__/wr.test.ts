@@ -179,3 +179,13 @@ describe('lengthClass', () => {
     expect(lengthClass('BLG', 10)).toBe('memorable');
   });
 });
+
+describe('cullHint wording', () => {
+  it('names the actual harvest range', () => {
+    const pond = { cullSlotMinIn: 8, cullSlotMaxIn: 13, wrThresholds: DEFAULT_THRESHOLDS };
+    expect(cullHint('LMB', 15, 100, pond).reason).toBe('over 13 in – let it grow');
+    expect(cullHint('LMB', 10, 80, pond).reason).toBe('8–13 in and thin – harvest');
+    expect(cullHint('LMB', 6, 100, pond).reason).toBe('under 8 in');
+    expect(cullHint('LMB', 15, 100, { ...pond, cullSlotMaxIn: 12.5 }).reason).toBe('over 12.5 in – let it grow');
+  });
+});

@@ -190,7 +190,11 @@ export function PondForm() {
           <input id="stocked" type="date" value={draft.stockedOn} onChange={set('stockedOn')} />
         </div>
 
-        <h2>Bass harvest slot (in)</h2>
+        <h2>Bass harvest range (in)</h2>
+        <div className="muted" style={{ fontSize: 14, marginBottom: 8 }}>
+          Bass in this length range are the ones to keep and thin out. Anything longer gets released so it can grow
+          into a big fish.
+        </div>
         <div className="field-grid">
           <div className="field">
             <label htmlFor="slotMin">Min</label>

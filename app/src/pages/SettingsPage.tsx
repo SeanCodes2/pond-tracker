@@ -84,8 +84,8 @@ export function SettingsPage() {
           <NumField label="Wr high" value={settings.defaultThresholds.high} onChange={(v) => patch({ defaultThresholds: { ...settings.defaultThresholds, high: v } })} />
         </div>
         <div className="field-grid">
-          <NumField label="Slot min (in)" value={settings.defaultSlot.minIn} onChange={(v) => patch({ defaultSlot: { ...settings.defaultSlot, minIn: v } })} />
-          <NumField label="Slot max (in)" value={settings.defaultSlot.maxIn} onChange={(v) => patch({ defaultSlot: { ...settings.defaultSlot, maxIn: v } })} />
+          <NumField label="Harvest min (in)" value={settings.defaultSlot.minIn} onChange={(v) => patch({ defaultSlot: { ...settings.defaultSlot, minIn: v } })} />
+          <NumField label="Harvest max (in)" value={settings.defaultSlot.maxIn} onChange={(v) => patch({ defaultSlot: { ...settings.defaultSlot, maxIn: v } })} />
         </div>
 
         <h2>Export</h2>

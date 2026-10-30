@@ -76,20 +76,27 @@ export function cullHint(
   const s = resolveSpecies(species);
   const t = pond.wrThresholds ?? DEFAULT_THRESHOLDS;
   if (s.code === 'LMB') {
-    // Over the slot: always release — these are the fish the pond is being managed to grow.
-    if (lengthIn > pond.cullSlotMaxIn) return { hint: 'release', reason: 'over slot – let it grow' };
-    // In the slot: thin fish are the clearest harvest; a healthy slot fish is a judgment call.
+    const lo = trimIn(pond.cullSlotMinIn);
+    const hi = trimIn(pond.cullSlotMaxIn);
+    // Longer than the harvest range: always release — these are the fish the pond is managed to grow.
+    if (lengthIn > pond.cullSlotMaxIn) return { hint: 'release', reason: `over ${hi} in – let it grow` };
+    // In the harvest range: thin fish are the clearest harvest; a healthy one is a judgment call.
     if (lengthIn >= pond.cullSlotMinIn) {
-      if (wr < t.ok) return { hint: 'keep', reason: 'in slot and thin – harvest' };
-      return { hint: 'your-call', reason: 'in slot, good shape' };
+      if (wr < t.ok) return { hint: 'keep', reason: `${lo}–${hi} in and thin – harvest` };
+      return { hint: 'your-call', reason: `${lo}–${hi} in, good shape` };
     }
-    // Below the slot: only flag the skinny ones.
-    if (wr < t.low) return { hint: 'keep', reason: 'small and thin' };
-    return { hint: 'your-call', reason: 'below slot' };
+    // Shorter than the harvest range: only flag the skinny ones.
+    if (wr < t.low) return { hint: 'keep', reason: `under ${lo} in and thin` };
+    return { hint: 'your-call', reason: `under ${lo} in` };
   }
-  if (wr < t.low) return { hint: 'keep', reason: 'thin forage – thin the herd' };
-  if (wr >= t.ok) return { hint: 'release', reason: 'healthy – keep as forage' };
+  if (wr < t.low) return { hint: 'keep', reason: 'thin – harvest to thin the herd' };
+  if (wr >= t.ok) return { hint: 'release', reason: 'healthy – leave as bass food' };
   return { hint: 'your-call', reason: 'fair condition' };
+}
+
+/** 13 -> "13", 12.5 -> "12.5" for short labels. */
+function trimIn(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 /**

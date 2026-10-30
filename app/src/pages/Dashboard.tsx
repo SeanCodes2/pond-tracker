@@ -56,7 +56,7 @@ export function Dashboard() {
       </div>
       <div className="muted" style={{ marginBottom: 12 }}>
         {pond.acres !== undefined ? `${pond.acres} ac · ` : ''}
-        slot {pond.cullSlotMinIn}–{pond.cullSlotMaxIn} in · {catches.length} catches
+        harvest {pond.cullSlotMinIn}–{pond.cullSlotMaxIn} in · {catches.length} catches
       </div>
 
       {catches.length === 0 ? <div className="empty">Log a few fish to see stats here.</div> : null}
@@ -201,7 +201,7 @@ function LengthChart({ code, catches, pond }: SpeciesProps & { pond: PondRow }) 
           { at: s.qualityIn, label: 'Q', title: `Quality ${s.qualityIn} in` },
           { at: s.preferredIn, label: 'P', title: `Preferred ${s.preferredIn} in` },
         ]}
-        slot={code === 'LMB' ? { min: pond.cullSlotMinIn, max: pond.cullSlotMaxIn, label: 'harvest slot' } : undefined}
+        slot={code === 'LMB' ? { min: pond.cullSlotMinIn, max: pond.cullSlotMaxIn, label: 'harvest range' } : undefined}
       />
     </div>
   );
