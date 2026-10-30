@@ -329,6 +329,25 @@ a {
   margin-left: 4px;
 }
 
+/* A suggested value (e.g. standard weight) the user hasn't confirmed yet. */
+.stepper-readout.dim {
+  color: var(--text-muted);
+}
+
+.stepper-readout.as-button {
+  font: inherit;
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  background: none;
+  border: 2px dashed var(--text-muted);
+  border-radius: 12px;
+  padding: 6px 10px;
+  min-height: 56px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
 .stepper-sub {
   font-size: 15px;
   color: var(--text-muted);

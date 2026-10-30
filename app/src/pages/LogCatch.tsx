@@ -10,14 +10,13 @@ import { WrGauge } from '../components/WrGauge';
 import { repo } from '../db/repo';
 import {
   LENGTH_RANGE,
-  WEIGHT_MAX_LB,
-  WEIGHT_MIN_LB,
   entryReducer,
   initialEntry,
   isCatchPrefill,
   isEntryValid,
   loadLastLength,
   saveLastLength,
+  weightRange,
 } from '../features/log/entryReducer';
 import { PondChip } from '../features/log/PondChip';
 import { useCurrentPond } from '../hooks/useCurrentPond';
@@ -33,8 +32,9 @@ export function LogCatch() {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const initialWeightStep = settings.weightUnits === 'lbsOz' ? OZ_LB : settings.weightStepLb;
   const [state, dispatch] = useReducer(entryReducer, DEFAULT_SPECIES, (s) => {
-    const base = initialEntry(s, loadLastLength());
+    const base = initialEntry(s, loadLastLength(), initialWeightStep);
     // Arriving from "Duplicate" on an existing catch: start with its species/length/weight.
     const prefill: unknown = (location.state as { prefill?: unknown } | null)?.prefill;
     return isCatchPrefill(prefill) ? entryReducer(base, { type: 'prefill', prefill }) : base;
@@ -57,10 +57,12 @@ export function LogCatch() {
   const lengthStep = settings.lengthStepIn;
   const weightStep = lbsOz ? OZ_LB : settings.weightStepLb;
   const range = LENGTH_RANGE[state.species];
+  const wRange = weightRange(state.species, state.lengthIn, weightStep);
   const pond = current.pond;
 
   const wsLb = useMemo(() => standardWeightLb(state.species, state.lengthIn), [state.species, state.lengthIn]);
-  const wr = state.weightLb > 0 ? relativeWeight(state.species, state.lengthIn, state.weightLb) : null;
+  // Wr only means something once the weight comes from the scale, not the suggestion.
+  const wr = state.weightLb > 0 && state.weightTouched ? relativeWeight(state.species, state.lengthIn, state.weightLb) : null;
   const band = wr === null ? null : wrBand(wr, pond?.wrThresholds ?? settings.defaultThresholds);
   const hint =
     wr === null
@@ -105,24 +107,39 @@ export function LogCatch() {
             ...(state.photo ? [] : [{ label: 'Add photo', onClick: () => navigate(`/catches/${row.id}?photo=1`) }]),
           ],
         });
-        dispatch({ type: 'reset' });
+        dispatch({ type: 'reset', weightStep });
         window.scrollTo({ top: 0 });
       } finally {
         setSaving(false);
       }
     },
-    [pond, saving, state, toast, navigate],
+    [pond, saving, state, toast, navigate, weightStep],
   );
 
   const hintLabel = hint ? `${HINT_WORD[hint.hint]} · ${hint.reason}` : undefined;
 
+  const gaugeHint = state.weightTouched ? hintLabel : 'Nudge the weight to your scale, or tap it if it matches';
+
   return (
-    <div className="page stack">
+    <div className="page stack log-page">
       <div className="row between">
         <PondChip current={current} />
       </div>
 
-      <SpeciesPicker value={state.species} onChange={(species) => dispatch({ type: 'species', species })} />
+      {/* Read-only results up top; every control sits in the lower half, within thumb reach. */}
+      <WrGauge wr={wr} band={band} hint={gaugeHint} />
+
+      {state.photo ? (
+        <div className="photo-strip">
+          <PhotoThumb file={state.photo} />
+          <div className="main" style={{ flex: 1 }}>
+            Photo attached
+          </div>
+          <button type="button" className="btn" onClick={() => dispatch({ type: 'photo', photo: null })}>
+            Remove
+          </button>
+        </div>
+      ) : null}
 
       <Stepper
         label="Length"
@@ -137,34 +154,28 @@ export function LogCatch() {
         sliderStep={0.25}
         min={range.minIn}
         max={range.maxIn}
-        onChange={(lengthIn) => dispatch({ type: 'length', lengthIn, step: lengthStep })}
+        onChange={(lengthIn) => dispatch({ type: 'length', lengthIn, step: lengthStep, weightStep })}
       />
 
       <Stepper
         label="Weight"
         value={state.weightLb}
-        readout={state.weightLb > 0 ? weightReadout(state.weightLb, lbsOz) : <span className="muted">—</span>}
-        sub={`standard: ${formatWeight(wsLb, settings.weightUnits)}`}
+        readout={weightReadout(state.weightLb, lbsOz)}
+        dim={!state.weightTouched}
+        onReadoutClick={state.weightTouched ? undefined : () => dispatch({ type: 'confirmWeight' })}
+        sub={
+          state.weightTouched
+            ? `standard: ${formatWeight(wsLb, settings.weightUnits)}`
+            : 'standard weight for this length · tap to confirm'
+        }
         step={weightStep}
         sliderStep={lbsOz ? OZ_LB : 0.05}
-        min={WEIGHT_MIN_LB}
-        max={WEIGHT_MAX_LB}
+        min={Math.min(wRange.min, state.weightLb)}
+        max={Math.max(wRange.max, state.weightLb)}
         onChange={(weightLb) => dispatch({ type: 'weight', weightLb, step: weightStep })}
       />
 
-      <WrGauge wr={wr} band={band} hint={hintLabel} />
-
-      {state.photo ? (
-        <div className="photo-strip">
-          <PhotoThumb file={state.photo} />
-          <div className="main" style={{ flex: 1 }}>
-            Photo attached
-          </div>
-          <button type="button" className="btn" onClick={() => dispatch({ type: 'photo', photo: null })}>
-            Remove
-          </button>
-        </div>
-      ) : null}
+      <SpeciesPicker value={state.species} onChange={(species) => dispatch({ type: 'species', species, weightStep })} />
 
       <div className="save-row">
         <PhotoInput
@@ -182,9 +193,6 @@ export function LogCatch() {
         </button>
       </div>
       {!pond ? <div className="muted">Add a pond to start logging.</div> : null}
-      {pond && settings.requireWeight && state.weightLb <= 0 ? (
-        <div className="muted">Enter a weight to save (or turn off “Require weight” in Settings).</div>
-      ) : null}
     </div>
   );
 }

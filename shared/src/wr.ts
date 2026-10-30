@@ -74,12 +74,19 @@ export function cullHint(
   pond: Pick<Pond, 'cullSlotMinIn' | 'cullSlotMaxIn' | 'wrThresholds'>,
 ): { hint: CullHint; reason: string } {
   const s = resolveSpecies(species);
-  if (s.code === 'LMB') {
-    if (lengthIn > pond.cullSlotMaxIn) return { hint: 'release', reason: 'over slot – let it grow' };
-    if (lengthIn < pond.cullSlotMinIn) return { hint: 'your-call', reason: 'below slot' };
-    return { hint: 'keep', reason: 'in harvest slot' };
-  }
   const t = pond.wrThresholds ?? DEFAULT_THRESHOLDS;
+  if (s.code === 'LMB') {
+    // Over the slot: always release — these are the fish the pond is being managed to grow.
+    if (lengthIn > pond.cullSlotMaxIn) return { hint: 'release', reason: 'over slot – let it grow' };
+    // In the slot: thin fish are the clearest harvest; a healthy slot fish is a judgment call.
+    if (lengthIn >= pond.cullSlotMinIn) {
+      if (wr < t.ok) return { hint: 'keep', reason: 'in slot and thin – harvest' };
+      return { hint: 'your-call', reason: 'in slot, good shape' };
+    }
+    // Below the slot: only flag the skinny ones.
+    if (wr < t.low) return { hint: 'keep', reason: 'small and thin' };
+    return { hint: 'your-call', reason: 'below slot' };
+  }
   if (wr < t.low) return { hint: 'keep', reason: 'thin forage – thin the herd' };
   if (wr >= t.ok) return { hint: 'release', reason: 'healthy – keep as forage' };
   return { hint: 'your-call', reason: 'fair condition' };

@@ -112,19 +112,25 @@ describe('wrBand', () => {
 
 describe('cullHint', () => {
   const pond = { cullSlotMinIn: 8, cullSlotMaxIn: 13, wrThresholds: DEFAULT_THRESHOLDS };
-  it('bass in slot => keep', () => {
-    const r = cullHint('LMB', 10, 90, pond);
+  it('bass in slot and thin => keep', () => {
+    const r = cullHint('LMB', 10, 88, pond);
     expect(r.hint).toBe('keep');
     expect(r.reason.length).toBeLessThanOrEqual(40);
   });
-  it('bass at slot edges => keep', () => {
-    expect(cullHint('LMB', 8, 90, pond).hint).toBe('keep');
-    expect(cullHint('LMB', 13, 90, pond).hint).toBe('keep');
+  it('bass in slot and healthy => your-call', () => {
+    expect(cullHint('LMB', 10, 95, pond).hint).toBe('your-call');
+    expect(cullHint('LMB', 12, 112, pond).hint).toBe('your-call');
   });
-  it('bass over slot => release', () => {
+  it('slot bounds are inclusive', () => {
+    expect(cullHint('LMB', 8, 85, pond).hint).toBe('keep');
+    expect(cullHint('LMB', 13, 85, pond).hint).toBe('keep');
+  });
+  it('bass over slot => release regardless of condition', () => {
     expect(cullHint('LMB', 16, 90, pond).hint).toBe('release');
+    expect(cullHint('LMB', 16, 70, pond).hint).toBe('release');
   });
-  it('bass below slot => your-call', () => {
+  it('bass below slot: thin => keep, otherwise your-call', () => {
+    expect(cullHint('LMB', 6, 80, pond).hint).toBe('keep');
     expect(cullHint('LMB', 6, 90, pond).hint).toBe('your-call');
   });
   it('bluegill by Wr', () => {
@@ -134,7 +140,7 @@ describe('cullHint', () => {
     expect(cullHint('RES', 7, 70, pond).hint).toBe('keep');
   });
   it('reasons are short', () => {
-    for (const [sp, len, wr] of [['LMB', 6, 90], ['LMB', 16, 90], ['BLG', 7, 70], ['BLG', 7, 90], ['BLG', 7, 99]] as const) {
+    for (const [sp, len, wr] of [['LMB', 6, 80], ['LMB', 6, 90], ['LMB', 10, 80], ['LMB', 10, 100], ['LMB', 16, 90], ['BLG', 7, 70], ['BLG', 7, 90], ['BLG', 7, 99]] as const) {
       expect(cullHint(sp, len, wr, pond).reason.length).toBeLessThanOrEqual(40);
     }
   });
