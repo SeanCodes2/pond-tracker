@@ -5,9 +5,14 @@ import { DEFAULT_SETTINGS } from '@pond-tracker/shared';
 /** 0 = synced, 1 = waiting for a future sync queue. Stored as a number so Dexie can index it. */
 export type Pending = 0 | 1;
 
-export type PondRow = Pond & { pending: Pending };
-export type CatchRow = Catch & { pending: Pending };
-export type FeedingLogRow = FeedingLog & { pending: Pending };
+/** Rows created by the sample-data seeder carry sample: 1 so they can be removed in one go. Not indexed. */
+export interface SampleFlag {
+  sample?: 1;
+}
+
+export type PondRow = Pond & { pending: Pending } & SampleFlag;
+export type CatchRow = Catch & { pending: Pending } & SampleFlag;
+export type FeedingLogRow = FeedingLog & { pending: Pending } & SampleFlag;
 
 export interface PhotoRow {
   id: string;

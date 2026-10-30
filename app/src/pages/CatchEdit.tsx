@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { Outcome, SpeciesCode } from '@pond-tracker/shared';
-import { relativeWeight, wrBand } from '@pond-tracker/shared';
+import { formatWeight, relativeWeight, standardWeightLb, wrBand } from '@pond-tracker/shared';
 import { CameraIcon, PhotoInput } from '../components/PhotoInput';
 import { SpeciesPicker } from '../components/SpeciesPicker';
 import { useToast } from '../components/Toast';
@@ -12,6 +12,7 @@ import { usePhotoUrl } from '../hooks/usePhotoUrl';
 import { usePond, usePonds } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
 import { fromLocalInput, toLocalInput } from '../lib/format';
+import type { CatchPrefill } from '../features/log/entryReducer';
 
 interface Draft {
   pondId: string;
@@ -72,6 +73,7 @@ export function CatchEdit() {
   const lengthNum = Number(draft.lengthIn);
   const weightNum = Number(draft.weightLb);
   const liveWr = lengthNum > 0 && weightNum > 0 ? relativeWeight(draft.speciesId, lengthNum, weightNum) : null;
+  const liveWs = lengthNum > 0 ? standardWeightLb(draft.speciesId, lengthNum) : null;
   const thresholds = pond?.wrThresholds ?? settings.defaultThresholds;
 
   const submit = async (e: FormEvent) => {
@@ -105,6 +107,15 @@ export function CatchEdit() {
     await repo.softDeleteCatch(row.id);
     toast.show({ message: 'Catch deleted', actions: [{ label: 'Undo', onClick: () => void repo.restoreCatch(row.id) }] });
     navigate(-1);
+  };
+
+  const duplicate = () => {
+    const prefill: CatchPrefill = {
+      speciesId: draft.speciesId,
+      lengthIn: lengthNum > 0 ? lengthNum : row.lengthIn,
+      weightLb: weightNum > 0 ? weightNum : row.weightLb,
+    };
+    navigate('/', { state: { prefill } });
   };
 
   const onPhoto = async (file: File) => {
@@ -156,9 +167,12 @@ export function CatchEdit() {
             <input id="wt" type="number" inputMode="decimal" step="0.01" value={draft.weightLb} onChange={set('weightLb')} />
           </div>
         </div>
-        <div className="row">
-          <span className="muted">Relative weight:</span>
-          {liveWr !== null ? <WrBadge wr={liveWr} band={wrBand(liveWr, thresholds)} /> : <span className="muted">—</span>}
+        <div className="row between live-wr">
+          <span className="muted">Standard weight: {liveWs !== null ? formatWeight(liveWs, settings.weightUnits) : '—'}</span>
+          <span className="row" style={{ gap: 6 }}>
+            <span className="muted">Wr</span>
+            {liveWr !== null ? <WrBadge wr={liveWr} band={wrBand(liveWr, thresholds)} /> : <span className="muted">—</span>}
+          </span>
         </div>
 
         <div className="segmented" role="radiogroup" aria-label="Outcome">
@@ -202,6 +216,9 @@ export function CatchEdit() {
         {error ? <div style={{ color: 'var(--danger)', fontWeight: 600 }}>{error}</div> : null}
         <button type="submit" className="btn primary block" style={{ minHeight: 56 }}>
           Save changes
+        </button>
+        <button type="button" className="btn block" onClick={duplicate}>
+          Duplicate as new catch
         </button>
         <button type="button" className="btn danger block" onClick={() => void remove()}>
           Delete catch

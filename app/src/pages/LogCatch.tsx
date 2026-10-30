@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Outcome, SpeciesCode } from '@pond-tracker/shared';
 import { cullHint, formatWeight, relativeWeight, standardWeightLb, wrBand } from '@pond-tracker/shared';
 import { CameraIcon, PhotoInput } from '../components/PhotoInput';
@@ -14,6 +14,7 @@ import {
   WEIGHT_MIN_LB,
   entryReducer,
   initialEntry,
+  isCatchPrefill,
   isEntryValid,
   loadLastLength,
   saveLastLength,
@@ -31,8 +32,24 @@ export function LogCatch() {
   const current = useCurrentPond();
   const toast = useToast();
   const navigate = useNavigate();
-  const [state, dispatch] = useReducer(entryReducer, DEFAULT_SPECIES, (s) => initialEntry(s, loadLastLength()));
+  const location = useLocation();
+  const [state, dispatch] = useReducer(entryReducer, DEFAULT_SPECIES, (s) => {
+    const base = initialEntry(s, loadLastLength());
+    // Arriving from "Duplicate" on an existing catch: start with its species/length/weight.
+    const prefill: unknown = (location.state as { prefill?: unknown } | null)?.prefill;
+    return isCatchPrefill(prefill) ? entryReducer(base, { type: 'prefill', prefill }) : base;
+  });
   const [saving, setSaving] = useState(false);
+  const prefilled = useRef(isCatchPrefill((location.state as { prefill?: unknown } | null)?.prefill));
+
+  // Clear the router state so a refresh or back-navigation doesn't prefill again.
+  useEffect(() => {
+    if (prefilled.current) {
+      prefilled.current = false;
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => saveLastLength(state.lastLength), [state.lastLength]);
 

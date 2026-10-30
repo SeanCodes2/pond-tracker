@@ -10,21 +10,33 @@
   },
   "routes": [
     {
+      "route": "/login.html",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/denied.html",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/icon*.{png,svg}",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
       "route": "/api/health",
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
       "route": "/api/*",
-      "allowedRoles": ["authenticated"]
+      "allowedRoles": ["angler"]
     },
     {
       "route": "/login",
-      "redirect": "/.auth/login/aad",
+      "redirect": "/login.html",
       "statusCode": 302
     },
     {
       "route": "/logout",
-      "redirect": "/.auth/logout",
+      "redirect": "/.auth/logout?post_logout_redirect_uri=/login.html",
       "statusCode": 302
     },
     {
@@ -34,12 +46,19 @@
     {
       "route": "/.auth/login/twitter",
       "statusCode": 404
+    },
+    {
+      "route": "/*",
+      "allowedRoles": ["angler"]
     }
   ],
   "responseOverrides": {
     "401": {
-      "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer",
+      "redirect": "/login.html",
       "statusCode": 302
+    },
+    "403": {
+      "rewrite": "/denied.html"
     }
   },
   "globalHeaders": {

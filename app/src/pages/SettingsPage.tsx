@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useNavigate } from 'react-router-dom';
 import type { Settings, WeightUnits } from '@pond-tracker/shared';
 import { useToast } from '../components/Toast';
 import { repo } from '../db/repo';
@@ -110,6 +112,89 @@ export function SettingsPage() {
         <div className="muted" style={{ fontSize: 14 }}>
           All data lives in this browser's IndexedDB on this phone. Export CSV regularly until cloud sync exists.
         </div>
+
+        <h2>Sample data</h2>
+        <SampleDataCard />
+
+        <h2>Records</h2>
+        <RecordsCard />
+      </div>
+    </div>
+  );
+}
+
+function RecordsCard() {
+  const navigate = useNavigate();
+  const deleted = useLiveQuery(async () => {
+    const [ponds, catches] = await Promise.all([repo.listDeletedPonds(), repo.listDeletedCatches()]);
+    return { ponds: ponds.length, catches: catches.length };
+  }, []);
+  const n = (deleted?.ponds ?? 0) + (deleted?.catches ?? 0);
+  return (
+    <div className="card">
+      <button type="button" className="list-item records-link" onClick={() => navigate('/settings/deleted')}>
+        <div className="main">
+          <div className="title">Recently deleted</div>
+          <div className="sub">
+            {deleted === undefined
+              ? 'Loading…'
+              : n === 0
+                ? 'Nothing deleted in the last 30 days'
+                : `${deleted.ponds} ${deleted.ponds === 1 ? 'pond' : 'ponds'} · ${deleted.catches} ${deleted.catches === 1 ? 'catch' : 'catches'} · kept 30 days`}
+          </div>
+        </div>
+        <span aria-hidden>›</span>
+      </button>
+      <div className="muted" style={{ fontSize: 14, marginTop: 8 }}>
+        Delete a pond from its Edit page; delete catches in bulk with Select on the Catches tab. Tap a catch to edit or duplicate it.
+      </div>
+    </div>
+  );
+}
+
+function SampleDataCard() {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const counts = useLiveQuery(() => repo.countSampleData(), []);
+  const [busy, setBusy] = useState(false);
+  const hasSample = (counts?.ponds ?? 0) > 0;
+
+  const add = async () => {
+    setBusy(true);
+    try {
+      const { pondId } = await repo.seedSampleData();
+      toast.show({ message: 'Sample pond added' });
+      navigate(`/ponds/${pondId}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!window.confirm('Remove the sample pond and all of its catches? Your own data is not touched.')) return;
+    setBusy(true);
+    try {
+      await repo.removeSampleData();
+      toast.show({ message: 'Sample data removed' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card sample-card">
+      <div className="muted" style={{ fontSize: 14 }}>
+        {hasSample
+          ? `A demo pond with ${counts?.catches ?? 0} catches is loaded. It is flagged as sample data and can be removed without touching your own ponds.`
+          : 'Load a demo pond with a season of bass and bluegill catches to see what the dashboard looks like with real numbers.'}
+      </div>
+      <div className="sample-actions">
+        <button type="button" className="btn primary" disabled={hasSample || busy || counts === undefined} onClick={() => void add()}>
+          Add sample data
+        </button>
+        <button type="button" className="btn danger" disabled={!hasSample || busy} onClick={() => void remove()}>
+          Remove sample data
+        </button>
       </div>
     </div>
   );

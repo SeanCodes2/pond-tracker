@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { LogCatch } from './pages/LogCatch';
 import { PondForm } from './pages/PondForm';
 import { Ponds } from './pages/Ponds';
+import { RecentlyDeleted } from './pages/RecentlyDeleted';
 import { SettingsPage } from './pages/SettingsPage';
 
 export function App() {
@@ -24,6 +25,7 @@ export function App() {
             <Route path="/catches" element={<Catches />} />
             <Route path="/catches/:id" element={<CatchEdit />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/deleted" element={<RecentlyDeleted />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <TabBar />

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f5132" />
+    <title>Pond Tracker: not invited</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, -apple-system, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f4f6f2; color: #0e1a12; }
+      @media (prefers-color-scheme: dark) { body { background: #0b1a12; color: #f1f6f2; } }
+      main { max-width: 420px; padding: 24px 20px; text-align: center; }
+      h1 { margin: 16px 0 8px; font-size: 28px; }
+      p { line-height: 1.5; opacity: 0.85; margin: 0 0 20px; }
+      a.btn { display: block; margin: 10px 0; padding: 16px; border-radius: 12px; background: #0f5132; color: #fff; text-decoration: none; font-weight: 600; font-size: 18px; }
+      @media (prefers-color-scheme: dark) { a.btn { background: #3cc26f; color: #06170d; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Not invited yet</h1>
+      <p>You're signed in, but this account hasn't been invited to Pond Tracker. Ask Sean for an invite and tell him which account you used.</p>
+      <a class="btn" href="/.auth/logout?post_logout_redirect_uri=/login.html">Sign out</a>
+    </main>
+  </body>
+</html>

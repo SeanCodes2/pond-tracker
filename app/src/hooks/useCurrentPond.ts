@@ -21,6 +21,15 @@ function writeLast(id: string): void {
   }
 }
 
+/** Forgets the remembered pond if it is the one given (used when a pond is deleted). */
+export function clearLastPond(id: string): void {
+  try {
+    if (localStorage.getItem(LAST_POND_KEY) === id) localStorage.removeItem(LAST_POND_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export type PondSource = 'gps' | 'last' | 'manual' | 'none';
 
 export interface CurrentPond {

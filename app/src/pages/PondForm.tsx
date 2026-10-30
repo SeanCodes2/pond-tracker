@@ -1,7 +1,11 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Pond } from '@pond-tracker/shared';
+import { ConfirmSheet } from '../components/ConfirmSheet';
+import { useToast } from '../components/Toast';
 import { repo } from '../db/repo';
+import { clearLastPond } from '../hooks/useCurrentPond';
 import { usePond } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
 import { getCurrentPosition } from '../lib/geo';
@@ -51,9 +55,13 @@ export function PondForm() {
   const existing = usePond(isNew ? undefined : id);
   const settings = useSettings();
   const navigate = useNavigate();
+  const toast = useToast();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const catchCount = useLiveQuery(() => (isNew || !id ? Promise.resolve(0) : repo.countCatches(id)), [id, isNew]) ?? 0;
 
   useEffect(() => {
     if (draft) return;
@@ -115,10 +123,29 @@ export function PondForm() {
   };
 
   const remove = async () => {
-    if (!id || isNew) return;
-    if (!window.confirm(`Delete "${draft.name}"? Its catches stay in the database but are hidden.`)) return;
-    await repo.softDeletePond(id);
-    navigate('/ponds', { replace: true });
+    if (!id || isNew || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await repo.softDeletePondCascade(id);
+      clearLastPond(id);
+      const name = draft.name.trim() || 'Pond';
+      toast.show({
+        message: `Deleted ${name} and ${plural(res.catches, 'catch', 'catches')}`,
+        durationMs: 8000,
+        actions: [
+          {
+            label: 'Undo',
+            onClick: () => {
+              void repo.restorePondCascade(id, res.deletedAt).then(() => toast.show({ message: `Restored ${name}` }));
+            },
+          },
+        ],
+      });
+      navigate('/ponds', { replace: true });
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   };
 
   return (
@@ -202,11 +229,26 @@ export function PondForm() {
           Save pond
         </button>
         {!isNew ? (
-          <button type="button" className="btn danger block" onClick={() => void remove()}>
+          <button type="button" className="btn danger block" onClick={() => setConfirmDelete(true)}>
             Delete pond
           </button>
         ) : null}
       </form>
+      <ConfirmSheet
+        open={confirmDelete}
+        title={`Delete ${draft.name.trim() || 'this pond'}?`}
+        confirmLabel={`Delete pond and ${plural(catchCount, 'catch', 'catches')}`}
+        busy={deleting}
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmDelete(false)}
+      >
+        This removes the pond and its {plural(catchCount, 'catch', 'catches')} from every list. You can restore them from
+        Settings → Recently deleted for 30 days.
+      </ConfirmSheet>
     </div>
   );
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
 }

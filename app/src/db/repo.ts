@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, relativeWeight, standardWeightLb } from '@pond-tracke
 import Dexie from 'dexie';
 import { db, type CatchRow, type FeedingLogRow, type PhotoRow, type PondRow, type PondTrackerDB } from './db';
 import { resizeImage } from '../lib/image';
+import { SAMPLE_POND_NAME, generateSampleCatches, generateSampleFeedingLogs } from './sample';
 
 const now = (): string => new Date().toISOString();
 const newId = (): string => crypto.randomUUID();
@@ -95,8 +96,20 @@ export function createRepo(database: PondTrackerDB) {
     await database.catches.update(id, { deletedAt: ts, updatedAt: ts, pending: 1 });
   }
 
-  async function restoreCatch(id: string): Promise<void> {
-    await database.catches.update(id, { deletedAt: undefined, updatedAt: now(), pending: 1 });
+  /** Restores a catch. If its pond is also soft-deleted the pond is restored too (pondRestored = true). */
+  async function restoreCatch(id: string): Promise<{ pondRestored: boolean }> {
+    return database.transaction('rw', database.catches, database.ponds, async () => {
+      const ts = now();
+      const c = await database.catches.get(id);
+      if (!c) return { pondRestored: false };
+      await database.catches.update(id, { deletedAt: undefined, updatedAt: ts, pending: 1 });
+      const pond = await database.ponds.get(c.pondId);
+      if (pond?.deletedAt) {
+        await database.ponds.update(pond.id, { deletedAt: undefined, updatedAt: ts, pending: 1 });
+        return { pondRestored: true };
+      }
+      return { pondRestored: false };
+    });
   }
 
   async function getCatch(id: string): Promise<CatchRow | undefined> {
@@ -200,7 +213,218 @@ export function createRepo(database: PondTrackerDB) {
     await database.feedingLogs.update(id, { deletedAt: ts, updatedAt: ts, pending: 1 });
   }
 
+  // ---------- sample data ----------
+  async function findSamplePond(): Promise<PondRow | undefined> {
+    return database.ponds.filter((p) => p.sample === 1 && !p.deletedAt).first();
+  }
+
+  /** Live-query friendly counts of seeded demo rows. */
+  async function countSampleData(): Promise<{ ponds: number; catches: number }> {
+    const [ponds, catches] = await Promise.all([
+      database.ponds.filter((p) => p.sample === 1 && !p.deletedAt).count(),
+      database.catches.filter((c) => c.sample === 1 && !c.deletedAt).count(),
+    ]);
+    return { ponds, catches };
+  }
+
+  /**
+   * Seed a deterministic demo pond with ~80 catches and two feeding logs.
+   * Idempotent: if a sample pond already exists it is returned untouched.
+   */
+  async function seedSampleData(): Promise<{ pondId: string }> {
+    const existing = await findSamplePond();
+    if (existing) return { pondId: existing.id };
+
+    const ts = now();
+    const year = new Date().getFullYear();
+    const pondId = newId();
+    const pond: PondRow = {
+      id: pondId,
+      name: SAMPLE_POND_NAME,
+      acres: 3.2,
+      lat: 38.81,
+      lon: -94.93,
+      geofenceM: 150,
+      cullSlotMinIn: 8,
+      cullSlotMaxIn: 13,
+      wrThresholds: { ...DEFAULT_SETTINGS.defaultThresholds },
+      notes: 'Demo data — remove from Settings',
+      createdAt: ts,
+      updatedAt: ts,
+      pending: 1,
+      sample: 1,
+    };
+    const catches: CatchRow[] = generateSampleCatches(year).map((c) => ({
+      ...c,
+      ...computeWr(c.speciesId, c.lengthIn, c.weightLb),
+      id: newId(),
+      pondId,
+      createdAt: ts,
+      updatedAt: ts,
+      pending: 1,
+      sample: 1,
+    }));
+    const feedingLogs: FeedingLogRow[] = generateSampleFeedingLogs(year).map((f) => ({
+      ...f,
+      id: newId(),
+      pondId,
+      createdAt: ts,
+      updatedAt: ts,
+      pending: 1,
+      sample: 1,
+    }));
+
+    await database.transaction('rw', database.ponds, database.catches, database.feedingLogs, async () => {
+      await database.ponds.put(pond);
+      await database.catches.bulkPut(catches);
+      await database.feedingLogs.bulkPut(feedingLogs);
+    });
+    return { pondId };
+  }
+
+  /** Hard-delete every row flagged sample: 1 (and any photos attached to sample catches). */
+  async function removeSampleData(): Promise<void> {
+    await database.transaction('rw', database.ponds, database.catches, database.feedingLogs, database.photos, async () => {
+      const sampleCatchIds = await database.catches.filter((c) => c.sample === 1).primaryKeys();
+      if (sampleCatchIds.length) {
+        await database.photos.where('catchId').anyOf(sampleCatchIds).delete();
+      }
+      await database.catches.filter((c) => c.sample === 1).delete();
+      await database.feedingLogs.filter((f) => f.sample === 1).delete();
+      await database.ponds.filter((p) => p.sample === 1).delete();
+    });
+  }
+
+  // ---------- records management (soft delete / restore / purge) ----------
+  interface CascadeResult {
+    /** Timestamp stamped on every row in this cascade; pass it to restorePondCascade for an exact undo. */
+    deletedAt: string;
+    catches: number;
+    feedingLogs: number;
+  }
+
+  /** Soft-deletes a pond together with its live catches and feeding logs, all stamped with one timestamp. */
+  async function softDeletePondCascade(pondId: string): Promise<CascadeResult> {
+    const ts = now();
+    return database.transaction('rw', database.ponds, database.catches, database.feedingLogs, async () => {
+      const catches = await database.catches.where('pondId').equals(pondId).filter((c) => !c.deletedAt).primaryKeys();
+      const logs = await database.feedingLogs.where('pondId').equals(pondId).filter((f) => !f.deletedAt).primaryKeys();
+      const stamp = { deletedAt: ts, updatedAt: ts, pending: 1 as const };
+      await database.ponds.update(pondId, stamp);
+      if (catches.length) await database.catches.where('id').anyOf(catches).modify(stamp);
+      if (logs.length) await database.feedingLogs.where('id').anyOf(logs).modify(stamp);
+      return { deletedAt: ts, catches: catches.length, feedingLogs: logs.length };
+    });
+  }
+
+  /**
+   * Restores a pond plus the catches/feeding logs deleted in the same cascade.
+   * `deletedAt` defaults to the pond's own deletedAt, so rows deleted earlier on their own stay deleted.
+   */
+  async function restorePondCascade(pondId: string, deletedAt?: string): Promise<CascadeResult> {
+    const ts = now();
+    return database.transaction('rw', database.ponds, database.catches, database.feedingLogs, async () => {
+      const pond = await database.ponds.get(pondId);
+      const stampToMatch = deletedAt ?? pond?.deletedAt;
+      const restore = { deletedAt: undefined, updatedAt: ts, pending: 1 as const };
+      if (pond) await database.ponds.update(pondId, restore);
+      if (!stampToMatch) return { deletedAt: '', catches: 0, feedingLogs: 0 };
+      const catches = await database.catches
+        .where('pondId')
+        .equals(pondId)
+        .filter((c) => c.deletedAt === stampToMatch)
+        .modify(restore);
+      const feedingLogs = await database.feedingLogs
+        .where('pondId')
+        .equals(pondId)
+        .filter((f) => f.deletedAt === stampToMatch)
+        .modify(restore);
+      return { deletedAt: stampToMatch, catches, feedingLogs };
+    });
+  }
+
+  async function softDeleteCatches(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const ts = now();
+    return database.catches
+      .where('id')
+      .anyOf(ids)
+      .filter((c) => !c.deletedAt)
+      .modify({ deletedAt: ts, updatedAt: ts, pending: 1 });
+  }
+
+  async function restoreCatches(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const ts = now();
+    return database.catches.where('id').anyOf(ids).modify({ deletedAt: undefined, updatedAt: ts, pending: 1 });
+  }
+
+  const byDeletedDesc = <T extends { deletedAt?: string }>(a: T, b: T) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? '');
+
+  /** Soft-deleted ponds, newest deletion first. */
+  async function listDeletedPonds(): Promise<PondRow[]> {
+    const rows = await database.ponds.filter((p) => !!p.deletedAt).toArray();
+    return rows.sort(byDeletedDesc);
+  }
+
+  /** Soft-deleted catches, newest deletion first. */
+  async function listDeletedCatches(): Promise<CatchRow[]> {
+    const rows = await database.catches.filter((c) => !!c.deletedAt).toArray();
+    return rows.sort(byDeletedDesc);
+  }
+
+  /** Permanently removes catches and their photos. */
+  async function hardDeleteCatches(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    return database.transaction('rw', database.catches, database.photos, async () => {
+      await database.photos.where('catchId').anyOf(ids).delete();
+      return database.catches.where('id').anyOf(ids).delete();
+    });
+  }
+
+  /** Permanently removes a pond with every catch (and photo) and feeding log that belongs to it. */
+  async function hardDeletePond(pondId: string): Promise<{ catches: number; feedingLogs: number }> {
+    return database.transaction('rw', database.ponds, database.catches, database.photos, database.feedingLogs, async () => {
+      const catchIds = await database.catches.where('pondId').equals(pondId).primaryKeys();
+      if (catchIds.length) await database.photos.where('catchId').anyOf(catchIds).delete();
+      const catches = await database.catches.where('pondId').equals(pondId).delete();
+      const feedingLogs = await database.feedingLogs.where('pondId').equals(pondId).delete();
+      await database.ponds.delete(pondId);
+      return { catches, feedingLogs };
+    });
+  }
+
+  /** Hard-deletes rows that were soft-deleted more than `olderThanDays` ago. Call once at app start. */
+  async function purgeDeleted(olderThanDays = 30): Promise<{ ponds: number; catches: number; feedingLogs: number }> {
+    const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString();
+    const old = (r: { deletedAt?: string }) => !!r.deletedAt && r.deletedAt < cutoff;
+    return database.transaction('rw', database.ponds, database.catches, database.photos, database.feedingLogs, async () => {
+      const pondIds = await database.ponds.filter(old).primaryKeys();
+      let catches = 0;
+      let feedingLogs = 0;
+      for (const id of pondIds) {
+        const r = await hardDeletePond(id);
+        catches += r.catches;
+        feedingLogs += r.feedingLogs;
+      }
+      const catchIds = await database.catches.filter(old).primaryKeys();
+      catches += await hardDeleteCatches(catchIds);
+      const logIds = await database.feedingLogs.filter(old).primaryKeys();
+      if (logIds.length) feedingLogs += await database.feedingLogs.where('id').anyOf(logIds).delete();
+      return { ponds: pondIds.length, catches, feedingLogs };
+    });
+  }
+
   return {
+    softDeletePondCascade,
+    restorePondCascade,
+    softDeleteCatches,
+    restoreCatches,
+    listDeletedPonds,
+    listDeletedCatches,
+    hardDeleteCatches,
+    hardDeletePond,
+    purgeDeleted,
     listPonds,
     getPond,
     savePond,
@@ -220,6 +444,9 @@ export function createRepo(database: PondTrackerDB) {
     listFeedingLogs,
     saveFeedingLog,
     softDeleteFeedingLog,
+    countSampleData,
+    seedSampleData,
+    removeSampleData,
   };
 }
 

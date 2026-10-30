@@ -67,3 +67,15 @@ curl http://localhost:7071/api/health
 ## Deploying
 
 See [`infra/README.md`](infra/README.md): create the resource group, deploy `infra/main.bicep`, set the `AZURE_STATIC_WEB_APPS_API_TOKEN` GitHub secret, then push to `main`. Expected run cost with Cosmos serverless + Free SWA is cents per month.
+
+## Access: invite-only
+
+`staticwebapp.config.json` requires the custom role **`angler`** for every route except `/login.html`, `/denied.html`, the icons and `/api/health`. Anyone not signed in is sent to the login page; anyone signed in without the role sees the "not invited" page. Nobody gets the role by default — you grant it per account:
+
+1. Azure portal → the Static Web App → **Role management** → **Invite**.
+2. Provider **Microsoft Entra ID** (`aad`), the person's email, role `angler`, expiry up to 168 hours for the invite link.
+3. Send them the generated link; they sign in once and the role sticks to that account.
+
+Or from the CLI: `az staticwebapp users invite -n swa-pondtracker -g rg-pondtracker --authentication-provider aad --user-details <email> --roles angler --domain <swa hostname> --invitation-expiration-in-hours 168`. Revoke with `az staticwebapp users update … --roles ""`.
+
+The installed PWA keeps working offline from its cache; the gate applies whenever the app shell or API is fetched from Azure.

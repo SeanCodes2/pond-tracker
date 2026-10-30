@@ -26,8 +26,29 @@ export interface EntryState {
   lastLength: Partial<Record<SpeciesCode, number>>;
 }
 
+/** Values carried over when duplicating an existing catch (router state from CatchEdit). */
+export interface CatchPrefill {
+  speciesId: SpeciesCode;
+  lengthIn: number;
+  weightLb: number;
+}
+
+export function isCatchPrefill(v: unknown): v is CatchPrefill {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.speciesId === 'string' &&
+    o.speciesId in LENGTH_RANGE &&
+    typeof o.lengthIn === 'number' &&
+    Number.isFinite(o.lengthIn) &&
+    typeof o.weightLb === 'number' &&
+    Number.isFinite(o.weightLb)
+  );
+}
+
 export type EntryAction =
   | { type: 'species'; species: SpeciesCode }
+  | { type: 'prefill'; prefill: CatchPrefill }
   | { type: 'length'; lengthIn: number; step: number }
   | { type: 'weight'; weightLb: number; step: number }
   | { type: 'photo'; photo: File | null }
@@ -68,6 +89,13 @@ export function entryReducer(state: EntryState, action: EntryAction): EntryState
     case 'weight': {
       const weightLb = clamp(roundToStep(action.weightLb, action.step), WEIGHT_MIN_LB, WEIGHT_MAX_LB);
       return { ...state, weightLb };
+    }
+    case 'prefill': {
+      const species = action.prefill.speciesId;
+      const r = LENGTH_RANGE[species];
+      const lengthIn = clamp(action.prefill.lengthIn, r.minIn, r.maxIn);
+      const weightLb = clamp(action.prefill.weightLb, WEIGHT_MIN_LB, WEIGHT_MAX_LB);
+      return { ...state, species, lengthIn, weightLb, lastLength: { ...state.lastLength, [species]: lengthIn } };
     }
     case 'photo':
       return { ...state, photo: action.photo };
