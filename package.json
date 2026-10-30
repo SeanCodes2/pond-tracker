@@ -9,6 +9,7 @@
     "api"
   ],
   "scripts": {
+    "postinstall": "npm run build -w shared",
     "dev": "npm run dev -w app",
     "build": "npm run build -w shared && npm run build -w app && npm run build -w api",
     "test": "npm run test -w shared && npm run test -w app --if-present",

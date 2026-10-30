@@ -1,8 +1,16 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Resolve the shared workspace package from its TypeScript source so `npm run dev`
+// works on a fresh clone without building shared/dist first, and edits hot-reload.
+const sharedSrc = fileURLToPath(new URL('../shared/src/index.ts', import.meta.url));
+
 export default defineConfig({
+  resolve: {
+    alias: { '@pond-tracker/shared': sharedSrc },
+  },
   plugins: [
     react(),
     VitePWA({
