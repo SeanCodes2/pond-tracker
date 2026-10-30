@@ -114,6 +114,7 @@ export function Catches() {
           <Link to={`/ponds/${pond.id}/catches`} className="active">
             Catches
           </Link>
+          <Link to={`/ponds/${pond.id}/feeder`}>Feeder</Link>
           <Link to={`/ponds/${pond.id}/edit`}>Edit</Link>
         </div>
       ) : null}

@@ -21,6 +21,8 @@ export interface SampleCatchInput {
 }
 
 export interface SampleFeedingLogInput {
+  kind: 'schedule' | 'fill';
+  feedTimes?: string[];
   startedOn: string;
   endedOn?: string;
   feederModel?: string;
@@ -150,7 +152,9 @@ export function generateSampleFeedingLogs(year: number): SampleFeedingLogInput[]
     {
       startedOn: `${year}-04-01`,
       endedOn: `${year}-10-15`,
+      kind: 'schedule',
       feederModel: 'Directional feeder',
+      feedTimes: ['07:00', '19:00'],
       feedsPerDay: 2,
       secondsPerFeed: 8,
       pelletSizeMm: 4.5,
@@ -159,6 +163,7 @@ export function generateSampleFeedingLogs(year: number): SampleFeedingLogInput[]
       notes: 'Season program: 2 feeds/day, 8 s each',
     },
     {
+      kind: 'fill',
       startedOn: `${year}-06-14`,
       endedOn: `${year}-06-14`,
       lbsPerFill: 50,

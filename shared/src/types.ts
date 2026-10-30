@@ -129,6 +129,13 @@ export interface FeedingLog {
   lbsPerFill?: number;
   /** ISO date of the most recent fill. */
   filledOn?: string;
+  /**
+   * 'schedule' = a period the feeder ran with these settings (shades charts);
+   * 'fill' = a one-day hopper refill record. Missing on older rows: treated as schedule.
+   */
+  kind?: 'schedule' | 'fill';
+  /** Daily feed times as local "HH:MM", e.g. ["07:00", "19:00"]. */
+  feedTimes?: string[];
   notes?: string;
   createdAt: string;
   updatedAt: string;

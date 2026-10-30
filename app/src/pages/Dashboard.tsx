@@ -52,6 +52,7 @@ export function Dashboard() {
           Dashboard
         </Link>
         <Link to={`/ponds/${pond.id}/catches`}>Catches</Link>
+        <Link to={`/ponds/${pond.id}/feeder`}>Feeder</Link>
         <Link to={`/ponds/${pond.id}/edit`}>Edit</Link>
       </div>
       <div className="muted" style={{ marginBottom: 12 }}>
@@ -247,6 +248,7 @@ function WrByMonthChart({ catches, species, feedingLogs, year, thresholds }: WrB
   });
 
   const bands = feedingLogs
+    .filter((f) => f.kind !== 'fill')
     .map((f) => ({
       from: monthFraction(`${f.startedOn}T12:00:00`, year),
       to: f.endedOn ? monthFraction(`${f.endedOn}T12:00:00`, year) : 12,

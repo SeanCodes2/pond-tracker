@@ -659,6 +659,7 @@ a {
 .field input[type='text'],
 .field input[type='number'],
 .field input[type='date'],
+.field input[type='time'],
 .field select,
 .field textarea {
   min-height: 48px;
@@ -859,7 +860,11 @@ a {
 }
 
 .subtabs a {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 10px;
+  font-size: 15px;
+  white-space: nowrap;
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -1315,4 +1320,34 @@ a {
 
 .live-wr {
   min-height: 36px;
+}
+
+/* ---- feeder ---- */
+.feeder-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 2px solid var(--text-muted);
+}
+.feeder-dot.on {
+  background: var(--wr-good);
+  border-color: var(--wr-good);
+}
+.feeder-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.feeder-time {
+  font-size: 24px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+input[type='time'] {
+  color: var(--text);
+  color-scheme: light dark;
 }

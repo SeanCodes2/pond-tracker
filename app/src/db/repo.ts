@@ -213,6 +213,72 @@ export function createRepo(database: PondTrackerDB) {
     await database.feedingLogs.update(id, { deletedAt: ts, updatedAt: ts, pending: 1 });
   }
 
+  /** Local calendar date as YYYY-MM-DD (feeding periods are whole days in pond time). */
+  function today(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function dayBefore(iso: string): string {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /** The feeder schedule currently running (open-ended), if any. */
+  async function currentFeederSchedule(pondId: string): Promise<FeedingLogRow | undefined> {
+    const rows = await listFeedingLogs(pondId);
+    return rows.find((f) => f.kind !== 'fill' && !f.endedOn);
+  }
+
+  interface ScheduleInput {
+    feedTimes: string[];
+    secondsPerFeed?: number;
+    feederModel?: string;
+    pelletSizeMm?: number;
+    notes?: string;
+    /** YYYY-MM-DD the new settings take effect; defaults to today. */
+    startedOn?: string;
+  }
+
+  /**
+   * Start (or change) the feeder schedule: closes the running period the day before the new
+   * one starts, so chart shading follows exactly when each setting was in effect.
+   */
+  async function startFeederSchedule(pondId: string, input: ScheduleInput): Promise<FeedingLogRow> {
+    const startedOn = input.startedOn ?? today();
+    const running = await currentFeederSchedule(pondId);
+    if (running) {
+      // Changing settings the same day it started: just edit that period.
+      if (running.startedOn >= startedOn) {
+        return saveFeedingLog({ ...running, ...input, kind: 'schedule', feedsPerDay: input.feedTimes.length, startedOn: running.startedOn });
+      }
+      await saveFeedingLog({ ...running, endedOn: dayBefore(startedOn) });
+    }
+    return saveFeedingLog({
+      pondId,
+      kind: 'schedule',
+      startedOn,
+      feedTimes: [...input.feedTimes].sort(),
+      feedsPerDay: input.feedTimes.length,
+      secondsPerFeed: input.secondsPerFeed,
+      feederModel: input.feederModel,
+      pelletSizeMm: input.pelletSizeMm,
+      notes: input.notes,
+    });
+  }
+
+  /** Turn the feeder off: ends the running schedule today. */
+  async function stopFeeder(pondId: string, endedOn = today()): Promise<void> {
+    const running = await currentFeederSchedule(pondId);
+    if (running) await saveFeedingLog({ ...running, endedOn: endedOn < running.startedOn ? running.startedOn : endedOn });
+  }
+
+  /** Record a hopper fill. */
+  async function logFeederFill(pondId: string, lbs?: number, on = today()): Promise<FeedingLogRow> {
+    return saveFeedingLog({ pondId, kind: 'fill', startedOn: on, endedOn: on, filledOn: on, lbsPerFill: lbs });
+  }
+
   // ---------- sample data ----------
   async function findSamplePond(): Promise<PondRow | undefined> {
     return database.ponds.filter((p) => p.sample === 1 && !p.deletedAt).first();
@@ -444,6 +510,10 @@ export function createRepo(database: PondTrackerDB) {
     listFeedingLogs,
     saveFeedingLog,
     softDeleteFeedingLog,
+    currentFeederSchedule,
+    startFeederSchedule,
+    stopFeeder,
+    logFeederFill,
     countSampleData,
     seedSampleData,
     removeSampleData,

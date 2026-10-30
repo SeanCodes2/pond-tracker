@@ -5,6 +5,7 @@ import { ToastProvider } from './components/Toast';
 import { CatchEdit } from './pages/CatchEdit';
 import { Catches } from './pages/Catches';
 import { Dashboard } from './pages/Dashboard';
+import { Feeder } from './pages/Feeder';
 import { LogCatch } from './pages/LogCatch';
 import { PondForm } from './pages/PondForm';
 import { Ponds } from './pages/Ponds';
@@ -23,6 +24,7 @@ export function App() {
               <Route path="/ponds/new" element={<PondForm />} />
               <Route path="/ponds/:id" element={<Dashboard />} />
               <Route path="/ponds/:id/edit" element={<PondForm />} />
+              <Route path="/ponds/:id/feeder" element={<Feeder />} />
               <Route path="/ponds/:id/catches" element={<Catches />} />
               <Route path="/catches" element={<Catches />} />
               <Route path="/catches/:id" element={<CatchEdit />} />
