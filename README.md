@@ -70,7 +70,13 @@ See [`infra/README.md`](infra/README.md): create the resource group, deploy `inf
 
 ## Access: invite-only
 
-`staticwebapp.config.json` requires the custom role **`angler`** for every route except `/login.html`, `/denied.html`, the icons and `/api/health`. Anyone not signed in is sent to the login page; anyone signed in without the role sees the "not invited" page. Nobody gets the role by default — you grant it per account:
+Access needs the custom role **`angler`**, granted per account. Nobody gets it by default.
+
+- **App pages:** the app checks `/.auth/me` on launch and whenever it returns to the foreground. If you're not signed in it sends you to `/login.html`; if you're signed in without `angler` it sends you to `/denied.html`. A device that has been approved once opens instantly and works offline.
+- **API (`/api/*`):** enforced by Azure in `staticwebapp.config.json`. This is where synced data will live, so it's the real boundary.
+- **Why the app files aren't gated by Azure:** if they were, any background service-worker update that ran while the session was expired would cache the login page as the app, and the installed app would be stuck on it. The code is a public repo and all data is on the device, so the static files expose nothing.
+
+To grant access:
 
 1. Azure portal → the Static Web App → **Role management** → **Invite**.
 2. Provider **Microsoft Entra ID** (`aad`), the person's email, role `angler`, expiry up to 168 hours for the invite link.
@@ -78,4 +84,4 @@ See [`infra/README.md`](infra/README.md): create the resource group, deploy `inf
 
 Or from the CLI: `az staticwebapp users invite -n swa-pondtracker -g rg-pondtracker --authentication-provider aad --user-details <email> --roles angler --domain <swa hostname> --invitation-expiration-in-hours 168`. Revoke with `az staticwebapp users update … --roles ""`.
 
-The installed PWA keeps working offline from its cache; the gate applies whenever the app shell or API is fetched from Azure.
+

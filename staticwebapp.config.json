@@ -5,55 +5,36 @@
     "exclude": [
       "/api/*",
       "/assets/*",
-      "/*.{css,js,mjs,map,png,jpg,jpeg,gif,svg,ico,webp,woff,woff2,ttf,json,webmanifest,txt}"
+      "/*.{css,js,mjs,map,png,jpg,jpeg,gif,svg,ico,webp,woff,woff2,ttf,json,webmanifest,txt}",
+      "/login.html",
+      "/denied.html"
     ]
   },
   "routes": [
     {
-      "route": "/login.html",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/denied.html",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/icon*.{png,svg}",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/apple-touch-icon.png",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
       "route": "/sw.js",
-      "allowedRoles": ["anonymous", "authenticated"],
-      "headers": { "Cache-Control": "no-cache" }
-    },
-    {
-      "route": "/workbox-*.js",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/registerSW.js",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
-      "route": "/manifest.webmanifest",
-      "allowedRoles": ["anonymous", "authenticated"]
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
     },
     {
       "route": "/assets/*",
-      "allowedRoles": ["anonymous", "authenticated"],
-      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
     },
     {
       "route": "/api/health",
-      "allowedRoles": ["anonymous", "authenticated"]
+      "allowedRoles": [
+        "anonymous",
+        "authenticated"
+      ]
     },
     {
       "route": "/api/*",
-      "allowedRoles": ["angler"]
+      "allowedRoles": [
+        "angler"
+      ]
     },
     {
       "route": "/login",
@@ -72,21 +53,8 @@
     {
       "route": "/.auth/login/twitter",
       "statusCode": 404
-    },
-    {
-      "route": "/*",
-      "allowedRoles": ["angler"]
     }
   ],
-  "responseOverrides": {
-    "401": {
-      "redirect": "/login.html",
-      "statusCode": 302
-    },
-    "403": {
-      "rewrite": "/denied.html"
-    }
-  },
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
