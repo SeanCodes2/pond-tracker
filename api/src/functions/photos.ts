@@ -3,8 +3,8 @@ import { DefaultAzureCredential } from '@azure/identity';
 import {
   BlobSASPermissions,
   BlobServiceClient,
+  StorageSharedKeyCredential,
   generateBlobSASQueryParameters,
-  type UserDelegationKey,
 } from '@azure/storage-blob';
 import { randomUUID } from 'node:crypto';
 import { getUser } from '../auth';
@@ -14,14 +14,23 @@ const SAS_TTL_MS = 15 * 60 * 1000;
 const PHOTO_ID_RE = /^[0-9a-f-]{36}$/i;
 
 let blobService: BlobServiceClient | undefined;
+let sharedKey: StorageSharedKeyCredential | undefined;
 
+/**
+ * Auth: STORAGE_ACCOUNT_KEY when set (SWA Free tier), otherwise DefaultAzureCredential
+ * (managed identity / az login) with user-delegation SAS.
+ */
 function getBlobService(): BlobServiceClient {
   if (!blobService) {
     const account = requireEnv('STORAGE_ACCOUNT_NAME');
-    blobService = new BlobServiceClient(
-      `https://${account}.blob.core.windows.net`,
-      new DefaultAzureCredential(),
-    );
+    const key = process.env.STORAGE_ACCOUNT_KEY;
+    const url = `https://${account}.blob.core.windows.net`;
+    if (key) {
+      sharedKey = new StorageSharedKeyCredential(account, key);
+      blobService = new BlobServiceClient(url, sharedKey);
+    } else {
+      blobService = new BlobServiceClient(url, new DefaultAzureCredential());
+    }
   }
   return blobService;
 }
@@ -31,8 +40,8 @@ function photosContainerName(): string {
 }
 
 /**
- * Build a user-delegation SAS URL for one blob. Requires the caller's identity
- * to hold Storage Blob Data Contributor (or Delegator) on the account.
+ * Build a short-lived SAS URL for one blob: signed with the account key when configured,
+ * otherwise a user-delegation SAS (identity needs Storage Blob Data Contributor).
  */
 async function blobSasUrl(
   blobName: string,
@@ -42,20 +51,18 @@ async function blobSasUrl(
   const service = getBlobService();
   const startsOn = new Date(Date.now() - 5 * 60 * 1000); // clock skew allowance
   const expiresOn = new Date(Date.now() + SAS_TTL_MS);
-  const key: UserDelegationKey = await service.getUserDelegationKey(startsOn, expiresOn);
   const containerName = photosContainerName();
-  const sas = generateBlobSASQueryParameters(
-    {
-      containerName,
-      blobName,
-      permissions: BlobSASPermissions.parse(permissions),
-      startsOn,
-      expiresOn,
-      ...(contentType ? { contentType } : {}),
-    },
-    key,
-    service.accountName,
-  ).toString();
+  const values = {
+    containerName,
+    blobName,
+    permissions: BlobSASPermissions.parse(permissions),
+    startsOn,
+    expiresOn,
+    ...(contentType ? { contentType } : {}),
+  };
+  const sas = sharedKey
+    ? generateBlobSASQueryParameters(values, sharedKey).toString()
+    : generateBlobSASQueryParameters(values, await service.getUserDelegationKey(startsOn, expiresOn), service.accountName).toString();
   const blobUrl = service.getContainerClient(containerName).getBlobClient(blobName).url;
   return { url: `${blobUrl}?${sas}`, expiresOn };
 }
@@ -63,6 +70,8 @@ async function blobSasUrl(
 interface UploadUrlRequest {
   catchId?: unknown;
   contentType?: unknown;
+  /** Optional client-generated UUID so the photo keeps the same id on device and in the cloud. */
+  photoId?: unknown;
 }
 
 async function uploadUrlHandler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -77,7 +86,10 @@ async function uploadUrlHandler(req: HttpRequest, context: InvocationContext): P
       throw new HttpError(400, '`contentType` must be an image/* type');
     }
 
-    const photoId = randomUUID();
+    if (body.photoId !== undefined && (typeof body.photoId !== 'string' || !PHOTO_ID_RE.test(body.photoId))) {
+      throw new HttpError(400, '`photoId` must be a UUID');
+    }
+    const photoId = typeof body.photoId === 'string' ? body.photoId.toLowerCase() : randomUUID();
     const blobName = `${user.userId}/${photoId}.jpg`;
     const { url, expiresOn } = await blobSasUrl(blobName, 'cw', contentType);
     context.info(`photos: upload-url user=${user.userId} catch=${body.catchId} photo=${photoId}`);

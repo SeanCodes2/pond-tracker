@@ -38,7 +38,9 @@ async function applyChanges(userId: string, changes: SyncDoc[], context: Invocat
   let applied = 0;
   for (const incoming of changes) {
     // Never trust the client's userId: force ownership from the auth principal.
-    const doc: SyncDoc = { ...incoming, userId };
+    // serverUpdatedAt is the server's own clock and is what pulls are keyed on, so a
+    // device with a skewed clock can't hide its changes from other devices.
+    const doc: SyncDoc = { ...incoming, userId, serverUpdatedAt: new Date().toISOString() };
     const { resource: existing } = await container.item(doc.id, userId).read<SyncDoc>();
     if (existing && existing.updatedAt >= doc.updatedAt) {
       continue; // server copy is newer or equal: last-writer-wins, keep server
@@ -55,12 +57,12 @@ async function fetchServerChanges(userId: string, since: string | null): Promise
   const query =
     since === null
       ? {
-          query: 'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.updatedAt ASC',
+          query: 'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.serverUpdatedAt ASC',
           parameters: [{ name: '@userId', value: userId }],
         }
       : {
           query:
-            'SELECT * FROM c WHERE c.userId = @userId AND c.updatedAt > @since ORDER BY c.updatedAt ASC',
+            'SELECT * FROM c WHERE c.userId = @userId AND c.serverUpdatedAt > @since ORDER BY c.serverUpdatedAt ASC',
           parameters: [
             { name: '@userId', value: userId },
             { name: '@since', value: since },

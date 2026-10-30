@@ -7,16 +7,15 @@ let container: Container | undefined;
 
 /**
  * Lazy singleton Cosmos client.
- * Auth is DefaultAzureCredential: managed identity in Azure, `az login` locally.
- * The account is deployed with disableLocalAuth=true, so keys are never used.
+ * Auth: COSMOS_KEY when set (SWA Free tier, key stored in app settings), otherwise
+ * DefaultAzureCredential (managed identity on SWA Standard, `az login` locally).
  * Partition key for the `docs` container is /userId.
  */
 export function getCosmosClient(): CosmosClient {
   if (!client) {
-    client = new CosmosClient({
-      endpoint: requireEnv('COSMOS_ENDPOINT'),
-      aadCredentials: new DefaultAzureCredential(),
-    });
+    const endpoint = requireEnv('COSMOS_ENDPOINT');
+    const key = process.env.COSMOS_KEY;
+    client = key ? new CosmosClient({ endpoint, key }) : new CosmosClient({ endpoint, aadCredentials: new DefaultAzureCredential() });
   }
   return client;
 }

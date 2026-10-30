@@ -8,7 +8,9 @@
     "COSMOS_CONTAINER": "docs",
     "STORAGE_ACCOUNT_NAME": "<your-storage-account>",
     "PHOTOS_CONTAINER": "photos",
-    "ALLOW_ANONYMOUS_DEV": "true"
+    "ALLOW_ANONYMOUS_DEV": "true",
+    "COSMOS_KEY": "",
+    "STORAGE_ACCOUNT_KEY": ""
   },
   "Host": {
     "LocalHttpPort": 7071,

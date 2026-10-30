@@ -1,8 +1,15 @@
-// Pond Tracker - Azure infrastructure
+// Pond Tracker - data resources for cloud sync (Cosmos DB + photo storage), wired into the
+// existing Static Web App.
+//
 // Deploy: az deployment group create -g rg-pondtracker -f infra/main.bicep -p infra/main.bicepparam
+//
+// The Static Web App itself (swa-pondtracker) was created separately and is referenced as an
+// existing resource. Auth to the data stores is by key: the keys are read inside Azure with
+// listKeys() and written straight into the SWA's app settings, so they never appear in
+// deployment outputs, the repo, or a terminal.
 targetScope = 'resourceGroup'
 
-@description('Azure region for all resources. Static Web Apps are deployed to a fixed set of regions; see swaLocation.')
+@description('Azure region for the data resources.')
 param location string = resourceGroup().location
 
 @description('Short prefix used to build resource names.')
@@ -13,43 +20,24 @@ param namePrefix string = 'pondtracker'
 @description('Environment label (prod, dev, ...).')
 param environment string = 'prod'
 
-@description('GitHub repository that the Static Web App builds from.')
-param repositoryUrl string = 'https://github.com/SeanCodes2/pond-tracker'
+@description('Name of the existing Static Web App that hosts the app and API.')
+param swaName string = 'swa-pondtracker'
 
-@description('Branch the Static Web App tracks.')
-param branch string = 'main'
-
-@description('Static Web Apps are only available in a handful of regions. Defaults to a SWA-supported region; keep it near `location`.')
-@allowed([
-  'centralus'
-  'eastus2'
-  'eastasia'
-  'westeurope'
-  'westus2'
-])
-param swaLocation string = 'centralus'
-
-@description('Origins allowed to PUT/GET photo blobs directly via SAS URLs. Add the SWA hostname (https://<swaHostname>) after the first deploy.')
-param blobCorsAllowedOrigins array = [
-  'https://localhost:5173'
+@description('Extra origins allowed to PUT/GET photo blobs via SAS (the SWA hostname is added automatically).')
+param extraBlobCorsOrigins array = [
+  'http://localhost:5173'
 ]
-
-@description('''
-Grant the Static Web App's system-assigned managed identity data-plane access to Cosmos DB and Blob Storage.
-NOTE: managed identity on the SWA-managed Functions backend is only supported on the Standard SKU. On the Free SKU
-the identity resource may deploy but the managed API cannot use it; set this to false and instead configure
-COSMOS_KEY / STORAGE_CONNECTION_STRING app settings (and adjust api/src/cosmos.ts + photos.ts accordingly),
-or upgrade the SWA to Standard.
-''')
-param useManagedIdentity bool = true
 
 var suffix = toLower(uniqueString(resourceGroup().id))
 var storageName = take(replace(toLower('${namePrefix}${environment}${suffix}'), '-', ''), 24)
 var cosmosName = toLower('${namePrefix}-${environment}-${suffix}')
-var swaName = toLower('${namePrefix}-${environment}')
 var tags = {
   app: 'pond-tracker'
   environment: environment
+}
+
+resource swa 'Microsoft.Web/staticSites@2023-12-01' existing = {
+  name: swaName
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +56,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   properties: {
     accessTier: 'Hot'
     allowBlobPublicAccess: false
-    allowSharedKeyAccess: true // user-delegation SAS does not need keys; leave on for az CLI convenience
+    allowSharedKeyAccess: true // the API signs SAS URLs with the account key
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
   }
@@ -81,7 +69,9 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01'
     cors: {
       corsRules: [
         {
-          allowedOrigins: blobCorsAllowedOrigins
+          // The phone PUTs photos straight to blob storage with a short SAS, so the app's
+          // origin must be allowed.
+          allowedOrigins: concat([ 'https://${swa.properties.defaultHostname}' ], extraBlobCorsOrigins)
           allowedMethods: [
             'GET'
             'HEAD'
@@ -114,7 +104,7 @@ resource photosContainer 'Microsoft.Storage/storageAccounts/blobServices/contain
 }
 
 // ---------------------------------------------------------------------------
-// Cosmos DB: serverless sync store
+// Cosmos DB: serverless sync store (pay per request; idle cost ~0)
 // ---------------------------------------------------------------------------
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
   name: cosmosName
@@ -123,7 +113,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
   kind: 'GlobalDocumentDB'
   properties: {
     databaseAccountOfferType: 'Standard'
-    disableLocalAuth: true
+    disableLocalAuth: false // key auth from the SWA-managed API (Free tier has no managed identity)
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     minimalTlsVersion: 'Tls12'
@@ -190,6 +180,7 @@ resource docsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/conta
             path: '/"_etag"/?'
           }
         ]
+        // Sync pulls are "userId = X AND serverUpdatedAt > since ORDER BY serverUpdatedAt".
         compositeIndexes: [
           [
             {
@@ -197,7 +188,7 @@ resource docsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/conta
               order: 'ascending'
             }
             {
-              path: '/updatedAt'
+              path: '/serverUpdatedAt'
               order: 'ascending'
             }
           ]
@@ -208,83 +199,27 @@ resource docsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/conta
 }
 
 // ---------------------------------------------------------------------------
-// Static Web App: hosts /app (static) + /api (managed Functions)
-// ---------------------------------------------------------------------------
-resource swa 'Microsoft.Web/staticSites@2023-12-01' = {
-  name: swaName
-  location: swaLocation
-  tags: tags
-  sku: {
-    name: 'Free'
-    tier: 'Free'
-  }
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    repositoryUrl: repositoryUrl
-    branch: branch
-    // We deploy via the GitHub Actions workflow with the deployment token, not SWA's auto-generated workflow.
-    provider: 'GitHub'
-    buildProperties: {
-      appLocation: 'app'
-      apiLocation: 'api'
-      outputLocation: 'dist'
-      skipGithubActionWorkflowGeneration: true
-    }
-    stagingEnvironmentPolicy: 'Enabled'
-    allowConfigFileUpdates: true
-  }
-}
-
 // App settings the managed API reads (api/local.settings.example.json mirrors these).
+// Note: this replaces the SWA's whole app-settings set.
+// ---------------------------------------------------------------------------
 resource swaSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
   parent: swa
   name: 'appsettings'
   properties: {
     COSMOS_ENDPOINT: cosmos.properties.documentEndpoint
+    COSMOS_KEY: cosmos.listKeys().primaryMasterKey
     COSMOS_DATABASE: cosmosDb.name
     COSMOS_CONTAINER: docsContainer.name
     STORAGE_ACCOUNT_NAME: storage.name
+    STORAGE_ACCOUNT_KEY: storage.listKeys().keys[0].value
     PHOTOS_CONTAINER: photosContainer.name
   }
 }
 
 // ---------------------------------------------------------------------------
-// Role assignments: SWA managed identity -> data planes
-// ---------------------------------------------------------------------------
-
-// Cosmos DB Built-in Data Contributor (SQL RBAC, not ARM RBAC)
-var cosmosDataContributorRoleId = '00000000-0000-0000-0000-000000000002'
-
-resource cosmosRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = if (useManagedIdentity) {
-  parent: cosmos
-  name: guid(cosmos.id, swa.id, cosmosDataContributorRoleId)
-  properties: {
-    roleDefinitionId: '${cosmos.id}/sqlRoleDefinitions/${cosmosDataContributorRoleId}'
-    principalId: swa.identity.principalId
-    scope: cosmos.id
-  }
-}
-
-// Storage Blob Data Contributor (ARM RBAC) - needed for getUserDelegationKey + blob exists checks
-var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-
-resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (useManagedIdentity) {
-  name: guid(storage.id, swa.id, storageBlobDataContributorRoleId)
-  scope: storage
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: swa.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Outputs
+// Outputs (no secrets)
 // ---------------------------------------------------------------------------
 output swaHostname string = swa.properties.defaultHostname
-output swaName string = swa.name
+output cosmosAccountName string = cosmos.name
 output cosmosEndpoint string = cosmos.properties.documentEndpoint
 output storageAccountName string = storage.name
-output swaPrincipalId string = swa.identity.principalId

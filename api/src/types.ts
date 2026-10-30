@@ -21,6 +21,8 @@ export interface SyncDoc {
   updatedAt: string;
   /** ISO-8601 timestamp; present when the record is a tombstone. */
   deletedAt?: string;
+  /** Set by the server on every write; `since` in a sync request compares against this. */
+  serverUpdatedAt?: string;
   [k: string]: unknown;
 }
 
