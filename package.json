@@ -1,0 +1,21 @@
+{
+  "name": "pond-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Phone-first catch log for pond management: relative weight, PSD and cull guidance for bass and bluegill.",
+  "workspaces": [
+    "shared",
+    "app",
+    "api"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w app",
+    "build": "npm run build -w shared && npm run build -w app && npm run build -w api",
+    "test": "npm run test -w shared && npm run test -w app --if-present",
+    "lint": "npm run lint -w app --if-present",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w app && npm run typecheck -w api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

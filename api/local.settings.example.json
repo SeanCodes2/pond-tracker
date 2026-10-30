@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "COSMOS_ENDPOINT": "https://<your-cosmos-account>.documents.azure.com:443/",
+    "COSMOS_DATABASE": "pondtracker",
+    "COSMOS_CONTAINER": "docs",
+    "STORAGE_ACCOUNT_NAME": "<your-storage-account>",
+    "PHOTOS_CONTAINER": "photos",
+    "ALLOW_ANONYMOUS_DEV": "true"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*"
+  }
+}

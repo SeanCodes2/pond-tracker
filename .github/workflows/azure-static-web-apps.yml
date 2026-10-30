@@ -1,0 +1,88 @@
+name: Azure Static Web Apps CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: swa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Build the whole workspace ourselves. SWA's Oryx build runs inside app_location and
+      # cannot see the hoisted root node_modules or the sibling `shared` workspace, so we
+      # build here and tell the deploy action to skip both builds.
+      - name: Install workspace
+        run: npm ci
+
+      - name: Typecheck and test
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Build shared, app, api
+        run: |
+          npm run build -w shared
+          npm run build -w app
+          npm run build -w api
+
+      # SWA reads staticwebapp.config.json from the deployed app folder, so copy the
+      # repo-root config into the built output.
+      - name: Stage SWA config
+        run: cp staticwebapp.config.json app/dist/staticwebapp.config.json
+
+      # With skip_api_build the uploaded api folder must be self-contained: compiled dist,
+      # host.json, package.json AND its own node_modules. npm workspaces hoist deps to the
+      # repo root, so re-install production deps directly inside api/ with workspaces off.
+      - name: Make api self-contained
+        working-directory: api
+        run: |
+          rm -rf node_modules
+          npm install --omit=dev --workspaces=false --install-links --no-package-lock --no-audit --no-fund
+          ls node_modules/@azure
+
+      - name: Deploy to Azure Static Web Apps
+        id: deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: app/dist
+          api_location: api
+          output_location: ''
+          skip_app_build: true
+          skip_api_build: true
+
+  close_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close PR preview environment
+    steps:
+      - name: Close preview
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close
