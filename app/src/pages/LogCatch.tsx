@@ -131,7 +131,6 @@ export function LogCatch() {
       <WrGauge wr={wr} band={band} hint={gaugeHint} />
 
       <Stepper
-        className="first-control"
         label="Length"
         value={state.lengthIn}
         readout={

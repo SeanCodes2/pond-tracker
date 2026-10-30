@@ -477,19 +477,61 @@ a {
 }
 
 /* ---------- log page ---------- */
-/* One screen, no scrolling: the page is exactly the space above the tab bar, and any
-   spare height goes above the controls so they stay at the bottom, near the thumb. */
+/* One screen, no scrolling. The page is pinned to the visible area above the tab bar with
+   position: fixed rather than sized with 100dvh, because Android's installed-app mode counts
+   the status bar in 100dvh and the page came out taller than the screen. Spare height goes
+   above the controls so they stay at the bottom, near the thumb. */
 .log-page {
-  height: 100dvh;
-  min-height: 0;
-  flex: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
+  max-width: 480px;
+  margin: 0 auto;
   gap: 10px;
   overflow-y: auto;
-  padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 10px);
+  overscroll-behavior: contain;
+  padding-bottom: 10px;
 }
 
-.log-page .first-control {
-  margin-top: auto;
+/* Nothing behind the Log screen should scroll either. */
+html:has(.log-page),
+body:has(.log-page) {
+  overflow: hidden;
+}
+
+#root:has(.log-page),
+.app:has(.log-page) {
+  min-height: 0;
+}
+
+/* Fill any screen: the two cards split whatever height is left, and inside each card the
+   –/+ buttons take up the slack, so bigger phones get bigger buttons instead of a gap. */
+.log-page > * {
+  flex: none;
+}
+
+.log-page .stepper {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-page .stepper-buttons {
+  flex: 1 1 auto;
+  min-height: 46px;
+}
+
+.log-page .stepper-buttons button {
+  min-height: 46px;
+  height: auto;
+  max-height: 120px;
+}
+
+.log-page .stepper input[type='range'] {
+  flex: none;
 }
 
 .log-page .chip {
