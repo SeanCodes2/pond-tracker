@@ -84,4 +84,31 @@ To grant access:
 
 Or from the CLI: `az staticwebapp users invite -n swa-pondtracker -g rg-pondtracker --authentication-provider aad --user-details <email> --roles angler --domain <swa hostname> --invitation-expiration-in-hours 168`. Revoke with `az staticwebapp users update … --roles ""`.
 
+## Sharing a pond
 
+Each person who can sign in gets their own private set of ponds. On top of that, an owner can share one pond with someone else:
+
+1. Give them app access first (the `angler` role, above).
+2. Owner: **Ponds → the pond → Edit → Invite someone**. That makes a one-time code (like `ABCD-2345`) that expires after 7 days. **Send code** opens the share sheet.
+3. The other person: **Ponds → Join**, enter the code. The pond shows up on their phone after a sync.
+
+| | Owner | Member |
+|---|---|---|
+| See the pond, its dashboard, every catch, feeder history | ✓ | ✓ |
+| Log catches in the pond | ✓ | ✓ |
+| Edit / delete / add photos to catches they logged | ✓ | ✓ |
+| Edit / delete someone else's catch | ✓ | – |
+| Change pond settings or the feeder, delete the pond | ✓ | – |
+| Invite people, remove members | ✓ | – |
+| Leave the pond | – | ✓ |
+
+When someone leaves or is removed, the pond and its data are wiped from their phone on the next sync. Catches they logged stay in the pond.
+
+How it's stored (Cosmos, partition key `/userId`):
+
+- A pond's records always live in the **owner's** partition, including catches a member logs (`loggedBy` = the member). The server decides the partition and `loggedBy` from the signed-in user; the app can't set either.
+- Access is a `pondMember` doc in the owner's partition, created only by redeeming a code (`pondInvite` docs, also in the owner's partition, never sent to apps).
+- A member's sync pulls their own partition plus the shared pond from the owner's partition; a newly joined pond is sent in full. Writes the member isn't allowed to make come back in `rejected` and the app undoes them.
+- Photos stay in the uploader's blob folder; `GET /api/photos/{id}` serves one only to its owner, the pond's owner, or a member of that pond.
+
+Rules live in `api/src/sharing.ts` (tests in `api/src/__tests__/sharing.test.ts`).

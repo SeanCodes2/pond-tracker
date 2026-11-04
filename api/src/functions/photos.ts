@@ -9,6 +9,8 @@ import {
 import { randomUUID } from 'node:crypto';
 import { getUser } from '../auth';
 import { HttpError, json, requireEnv, toErrorResponse } from '../http';
+import { loadAccess, resolvePhotoBlob } from '../sharing';
+import { getStore } from '../store';
 
 const SAS_TTL_MS = 15 * 60 * 1000;
 const PHOTO_ID_RE = /^[0-9a-f-]{36}$/i;
@@ -106,9 +108,12 @@ async function getPhotoHandler(req: HttpRequest, context: InvocationContext): Pr
     if (!PHOTO_ID_RE.test(photoId)) {
       throw new HttpError(400, 'Invalid photoId');
     }
-    // Blob path is scoped to the caller's userId, so a user can only ever
-    // reach their own photos regardless of the id they pass.
-    const blobName = `${user.userId}/${photoId}.jpg`;
+    // The photo doc decides which blob to serve, and only if the caller owns it, owns the pond it
+    // belongs to, or is a member of that pond. Otherwise this falls back to the caller's own folder,
+    // so nobody can reach someone else's photo by guessing an id.
+    const store = getStore();
+    const access = await loadAccess(store, user.userId);
+    const blobName = await resolvePhotoBlob(store, user.userId, photoId.toLowerCase(), access);
     const exists = await getBlobService()
       .getContainerClient(photosContainerName())
       .getBlobClient(blobName)

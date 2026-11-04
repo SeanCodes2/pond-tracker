@@ -100,6 +100,13 @@ export interface Catch {
   /** ISO timestamp the fish was caught. */
   caughtAt: string;
   photoId?: string;
+  /**
+   * Who logged the fish (server userId). Set by the server; missing on a catch logged on this
+   * phone that hasn't been through a sync, which always means "you".
+   */
+  loggedBy?: string;
+  /** Display name of whoever logged it (their sign-in email). */
+  loggedByName?: string;
   lat?: number;
   lon?: number;
   waterTempF?: number;
@@ -107,6 +114,24 @@ export interface Catch {
   lure?: string;
   notes?: string;
   createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+/**
+ * Someone other than the owner who can see a pond and log catches in it. Created on the server
+ * when an invite code is redeemed; a tombstone (deletedAt) means they left or were removed.
+ */
+export interface PondMember {
+  id: string;
+  pondId: string;
+  ownerId: string;
+  ownerName: string;
+  memberId: string;
+  memberName: string;
+  pondName: string;
+  role: 'member';
+  joinedAt: string;
   updatedAt: string;
   deletedAt?: string;
 }

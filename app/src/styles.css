@@ -1585,3 +1585,81 @@ input[type='time'] {
 .explain-body p {
   margin: 10px 0;
 }
+
+/* ---------- Shared ponds ---------- */
+
+.shared-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 12px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notice {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+/* Wraps form fields so `disabled` reaches them all without changing the form's layout. */
+fieldset.plain {
+  display: contents;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+fieldset.plain:disabled input,
+fieldset.plain:disabled select,
+fieldset.plain:disabled textarea,
+select:disabled {
+  opacity: 0.75;
+}
+
+.list-item.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.member-row .sub {
+  overflow-wrap: anywhere;
+}
+
+.invite-code {
+  margin: 8px 0 4px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  user-select: all;
+}
+
+.code-input {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.detail-list .row {
+  align-items: baseline;
+  gap: 12px;
+}

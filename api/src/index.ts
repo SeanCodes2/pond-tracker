@@ -5,3 +5,4 @@
 import './functions/health';
 import './functions/sync';
 import './functions/photos';
+import './functions/shares';

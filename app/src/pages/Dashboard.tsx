@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import type { SpeciesCode, WrThresholds } from '@pond-tracker/shared';
 import { SPECIES, lengthFrequency, pondGuidance, psd, wrBand, wrByClass } from '@pond-tracker/shared';
 import { ENABLED_SPECIES } from '../components/SpeciesPicker';
@@ -8,6 +8,7 @@ import { BarChart } from '../components/charts/BarChart';
 import { Histogram } from '../components/charts/Histogram';
 import { LineChart, type LineSeries } from '../components/charts/LineChart';
 import { PsdMeter } from '../components/charts/PsdMeter';
+import { PondTabs } from '../components/PondTabs';
 import type { CatchRow, FeedingLogRow, PondRow } from '../db/db';
 import { repo } from '../db/repo';
 import { usePond } from '../hooks/usePonds';
@@ -48,14 +49,7 @@ export function Dashboard() {
   return (
     <div className="page">
       <h1>{pond.name}</h1>
-      <div className="subtabs">
-        <Link to={`/ponds/${pond.id}`} className="active">
-          Dashboard
-        </Link>
-        <Link to={`/ponds/${pond.id}/catches`}>Catches</Link>
-        <Link to={`/ponds/${pond.id}/feeder`}>Feeder</Link>
-        <Link to={`/ponds/${pond.id}/edit`}>Edit</Link>
-      </div>
+      <PondTabs pondId={pond.id} active="dashboard" />
       <div className="muted" style={{ marginBottom: 12 }}>
         {pond.acres !== undefined ? `${pond.acres} ac · ` : ''}
         harvest {pond.cullSlotMinIn}–{pond.cullSlotMaxIn} in · {catches.length} catches

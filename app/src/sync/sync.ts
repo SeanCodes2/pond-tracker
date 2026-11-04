@@ -9,19 +9,33 @@ import { DEFAULT_SETTINGS } from '@pond-tracker/shared';
 import { db, type PhotoRow, type PondTrackerDB, type SyncStateRow, type SyncStatus } from '../db/db';
 
 export type SyncDocType = 'pond' | 'catch' | 'feedingLog' | 'settings' | 'photo';
+/** Doc types the server sends but the app never pushes. */
+export type ServerDocType = 'pondMember';
 
 /** Wire shape; mirrors api/src/types.ts (kept local so the app doesn't import the API). */
 export interface SyncDoc {
   id: string;
-  type: SyncDocType;
+  type: SyncDocType | ServerDocType;
   updatedAt: string;
   deletedAt?: string;
   [k: string]: unknown;
 }
 
+/** A pushed change the server refused (e.g. a member editing a shared pond). */
+interface RejectedChange {
+  id: string;
+  type: SyncDocType;
+  reason: string;
+  /** The server's copy to restore; absent = drop the local row. */
+  doc?: SyncDoc;
+}
+
 interface SyncResponse {
   serverChanges: SyncDoc[];
   serverTime: string;
+  /** Older servers don't send these. */
+  viewerId?: string;
+  rejected?: RejectedChange[];
 }
 
 interface UploadUrlResponse {
@@ -35,6 +49,8 @@ export interface SyncResult {
   pushed: number;
   pulled: number;
   photosUploaded: number;
+  /** Pushed changes the server refused and that were undone on this phone. */
+  rejected: number;
   status: SyncStatus;
   error?: string;
 }
@@ -48,13 +64,14 @@ const BATCH_SIZE = 200;
 const LOCAL_ONLY = ['pending', 'sample', 'blob'] as const;
 const SERVER_ONLY = ['type', 'userId', 'serverUpdatedAt'] as const;
 
-type RecordTable = 'ponds' | 'catches' | 'feedingLogs' | 'settings' | 'photos';
-const TABLE_FOR: Record<SyncDocType, RecordTable> = {
+type RecordTable = 'ponds' | 'catches' | 'feedingLogs' | 'settings' | 'photos' | 'pondMembers';
+const TABLE_FOR: Record<SyncDocType | ServerDocType, RecordTable> = {
   pond: 'ponds',
   catch: 'catches',
   feedingLog: 'feedingLogs',
   settings: 'settings',
   photo: 'photos',
+  pondMember: 'pondMembers',
 };
 
 /** A row we pushed, with the updatedAt we pushed, so pending is cleared only if it hasn't changed since. */
@@ -115,6 +132,19 @@ export async function countPending(database: PondTrackerDB = db): Promise<{ reco
     .filter((p) => !samples.has(p.catchId))
     .count();
   return { records: ponds + catches + logs + (settings?.pending === 1 ? 1 : 0), photos };
+}
+
+/**
+ * Removes everything this phone holds for a pond someone else shared with you, after you left
+ * or were removed. Runs inside the caller's transaction when there is one.
+ */
+export async function dropSharedPond(database: PondTrackerDB, pondId: string): Promise<void> {
+  const catchIds = await database.catches.where('pondId').equals(pondId).primaryKeys();
+  if (catchIds.length) await database.photos.where('catchId').anyOf(catchIds).delete();
+  await database.catches.where('pondId').equals(pondId).delete();
+  await database.feedingLogs.where('pondId').equals(pondId).delete();
+  await database.pondMembers.where('pondId').equals(pondId).delete();
+  await database.ponds.delete(pondId);
 }
 
 export function createSyncEngine(database: PondTrackerDB, fetchImpl: FetchLike = (i, init) => fetch(i, init)) {
@@ -221,9 +251,10 @@ export function createSyncEngine(database: PondTrackerDB, fetchImpl: FetchLike =
   }
 
   /** Applies server docs with last-writer-wins. Returns how many changed a local row. */
-  async function applyServerChanges(docs: SyncDoc[]): Promise<number> {
+  async function applyServerChanges(docs: SyncDoc[], viewerId: string | undefined): Promise<number> {
     if (!docs.length) return 0;
     let applied = 0;
+    const lostAccess = new Set<string>();
     const tables = Object.values(TABLE_FOR).map((t) => database.table(t));
     await database.transaction('rw', tables, async () => {
       for (const doc of docs) {
@@ -241,9 +272,33 @@ export function createSyncEngine(database: PondTrackerDB, fetchImpl: FetchLike =
         // so the local blob is stale: drop it and let usePhotoUrl load it from the API.
         await table.put({ ...omit(doc, SERVER_ONLY), id, pending: 0 } as { id: string; pending: number });
         applied++;
+        if (doc.type === 'pondMember' && doc.deletedAt && viewerId && doc['memberId'] === viewerId) {
+          lostAccess.add(String(doc['pondId']));
+        }
       }
+      for (const pondId of lostAccess) await dropSharedPond(database, pondId);
     });
     return applied;
+  }
+
+  /** Undoes pushed changes the server refused: restore its copy, or drop a row it never had. */
+  async function applyRejected(rejected: RejectedChange[]): Promise<number> {
+    if (!rejected.length) return 0;
+    const tables = Object.values(TABLE_FOR).map((t) => database.table(t));
+    await database.transaction('rw', tables, async () => {
+      for (const r of rejected) {
+        const tableName = TABLE_FOR[r.type];
+        if (!tableName || r.type === 'settings') continue;
+        const table = database.table<{ id: string }, string>(tableName);
+        if (r.doc) {
+          await table.put({ ...omit(r.doc, SERVER_ONLY), id: r.id, pending: 0 } as { id: string; pending: number });
+        } else {
+          await table.delete(r.id);
+          if (r.type === 'catch') await database.photos.where('catchId').equals(r.id).delete();
+        }
+      }
+    });
+    return rejected.length;
   }
 
   async function saveState(patch: Partial<SyncStateRow>): Promise<void> {
@@ -254,7 +309,7 @@ export function createSyncEngine(database: PondTrackerDB, fetchImpl: FetchLike =
   }
 
   async function runOnce(): Promise<SyncResult> {
-    const result: SyncResult = { pushed: 0, pulled: 0, photosUploaded: 0, status: 'ok' };
+    const result: SyncResult = { pushed: 0, pulled: 0, photosUploaded: 0, rejected: 0, status: 'ok' };
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       await saveState({ lastStatus: 'offline' });
       return { ...result, status: 'offline' };
@@ -274,7 +329,10 @@ export function createSyncEngine(database: PondTrackerDB, fetchImpl: FetchLike =
         const res = await api<SyncResponse>('/api/sync', { since, changes: batch.map((o) => o.doc) });
         await clearPending(batch.map((o) => o.ref));
         result.pushed += batch.length;
-        result.pulled += await applyServerChanges(res.serverChanges);
+        // Store who we are before applying, so shared ponds never render as ours even for a moment.
+        if (res.viewerId) await saveState({ viewerId: res.viewerId });
+        result.rejected += await applyRejected(res.rejected ?? []);
+        result.pulled += await applyServerChanges(res.serverChanges, res.viewerId);
         // Advance `since` only after this response's changes are applied, so a crash re-pulls them.
         since = res.serverTime;
         await saveState({ lastServerTime: since });

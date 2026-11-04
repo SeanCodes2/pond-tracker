@@ -12,7 +12,7 @@
     "postinstall": "npm run build -w shared",
     "dev": "npm run dev -w app",
     "build": "npm run build -w shared && npm run build -w app && npm run build -w api",
-    "test": "npm run test -w shared && npm run test -w app --if-present",
+    "test": "npm run test -w shared && npm run test -w app --if-present && npm run test -w api",
     "lint": "npm run lint -w app --if-present",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w app && npm run typecheck -w api"
   },

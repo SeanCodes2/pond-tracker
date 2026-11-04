@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { Outcome, SpeciesCode } from '@pond-tracker/shared';
 import { SPECIES, wrBand } from '@pond-tracker/shared';
 import { ConfirmSheet } from '../components/ConfirmSheet';
+import { PondTabs } from '../components/PondTabs';
 import { ENABLED_SPECIES } from '../components/SpeciesPicker';
 import { useToast } from '../components/Toast';
 import { WrBadge } from '../components/WrGauge';
@@ -12,6 +13,8 @@ import { repo } from '../db/repo';
 import { usePhotoUrl } from '../hooks/usePhotoUrl';
 import { usePond, usePonds } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
+import { useSharing } from '../hooks/useSharing';
+import { canEditCatch, isMine, roleFor, shortName } from '../lib/sharing';
 import { formatDateTime, formatLength, formatWeightUnits, speciesShortName } from '../lib/format';
 
 const PAGE = 200;
@@ -32,6 +35,12 @@ export function Catches() {
   const all = useLiveQuery(() => repo.listCatches(pondId), [pondId]);
   const thresholds = pond?.wrThresholds ?? settings.defaultThresholds;
   const pondName = new Map((ponds ?? []).map((p) => [p.id, p.name]));
+  const { viewerId, members } = useSharing();
+  const sharedPonds = useMemo(() => new Set(members.filter((m) => !m.deletedAt).map((m) => m.pondId)), [members]);
+  /** In a pond shared with you, only the catches you logged can be changed. */
+  const editable = (c: CatchRow) => canEditCatch(c, roleFor(c.pondId, members, viewerId), viewerId);
+  /** "sean" under someone else's catch in a shared pond. */
+  const caughtBy = (c: CatchRow) => (sharedPonds.has(c.pondId) && !isMine(c, viewerId) ? shortName(c.loggedByName) : undefined);
 
   const [species, setSpecies] = useState<SpeciesFilter>('all');
   const [outcome, setOutcome] = useState<OutcomeFilter>('all');
@@ -71,7 +80,7 @@ export function Catches() {
     setSelected(next);
   };
 
-  const selectAllShown = () => setSelected(new Set((shown ?? []).map((c) => c.id)));
+  const selectAllShown = () => setSelected(new Set((shown ?? []).filter(editable).map((c) => c.id)));
 
   const stopSelecting = () => {
     setSelecting(false);
@@ -109,14 +118,7 @@ export function Catches() {
         ) : null}
       </div>
       {pond ? (
-        <div className="subtabs">
-          <Link to={`/ponds/${pond.id}`}>Dashboard</Link>
-          <Link to={`/ponds/${pond.id}/catches`} className="active">
-            Catches
-          </Link>
-          <Link to={`/ponds/${pond.id}/feeder`}>Feeder</Link>
-          <Link to={`/ponds/${pond.id}/edit`}>Edit</Link>
-        </div>
+        <PondTabs pondId={pond.id} active="catches" />
       ) : null}
 
       <div className="filter-row" role="group" aria-label="Filters">
@@ -163,7 +165,9 @@ export function Catches() {
             units={settings.weightUnits}
             pondLabel={pondId ? undefined : pondName.get(c.pondId)}
             thresholds={thresholds}
+            caughtBy={caughtBy(c)}
             selecting={selecting}
+            locked={!editable(c)}
             checked={visibleSelected.has(c.id)}
             onToggle={() => toggle(c.id)}
           />
@@ -218,12 +222,16 @@ interface CatchItemProps {
   units: 'decimal' | 'lbsOz';
   pondLabel?: string;
   thresholds: { low: number; ok: number; high: number };
+  /** Set for someone else's catch in a shared pond. */
+  caughtBy?: string;
   selecting: boolean;
+  /** Can't be selected for deletion (someone else's catch). */
+  locked: boolean;
   checked: boolean;
   onToggle: () => void;
 }
 
-function CatchItem({ c, units, pondLabel, thresholds, selecting, checked, onToggle }: CatchItemProps) {
+function CatchItem({ c, units, pondLabel, thresholds, caughtBy, selecting, locked, checked, onToggle }: CatchItemProps) {
   const url = usePhotoUrl(c.photoId);
   const body = (
     <>
@@ -243,10 +251,18 @@ function CatchItem({ c, units, pondLabel, thresholds, selecting, checked, onTogg
           {c.weightLb > 0 ? `${formatWeightUnits(c.weightLb, units)} · ` : ''}
           {formatDateTime(c.caughtAt)}
           {pondLabel ? ` · ${pondLabel}` : ''}
+          {caughtBy ? ` · ${caughtBy}` : ''}
         </div>
       </div>
     </>
   );
+  if (selecting && locked) {
+    return (
+      <div className="list-item selectable locked" aria-disabled="true">
+        {body}
+      </div>
+    );
+  }
   if (selecting) {
     return (
       <button type="button" className={`list-item selectable${checked ? ' active' : ''}`} role="checkbox" aria-checked={checked} onClick={onToggle}>

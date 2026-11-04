@@ -6,6 +6,8 @@ import { useToast } from '../components/Toast';
 import { db, type CatchRow, type PondRow } from '../db/db';
 import { repo } from '../db/repo';
 import { useSettings } from '../hooks/useSettings';
+import { useSharing } from '../hooks/useSharing';
+import { canEditCatch, roleFor } from '../lib/sharing';
 import { formatDateTime, formatLength, formatWeightUnits, speciesShortName } from '../lib/format';
 
 type Target = { kind: 'pond'; row: PondRow; catches: number } | { kind: 'catch'; row: CatchRow } | { kind: 'all' };
@@ -18,6 +20,7 @@ export function RecentlyDeleted() {
   const allPonds = useLiveQuery(() => db.ponds.toArray(), []);
   const [target, setTarget] = useState<Target | null>(null);
   const [busy, setBusy] = useState(false);
+  const { viewerId, members } = useSharing();
 
   const pondById = useMemo(() => new Map((allPonds ?? []).map((p) => [p.id, p])), [allPonds]);
 
@@ -25,16 +28,19 @@ export function RecentlyDeleted() {
   const { pondItems, catchItems } = useMemo(() => {
     const cascaded = new Map<string, number>();
     const singles: CatchRow[] = [];
+    // In ponds shared with you, only what you can change is yours to restore.
+    const role = (pondId: string) => roleFor(pondId, members, viewerId);
     for (const c of deletedCatches ?? []) {
+      if (!canEditCatch(c, role(c.pondId), viewerId)) continue;
       const pond = pondById.get(c.pondId);
       if (pond?.deletedAt && pond.deletedAt === c.deletedAt) cascaded.set(pond.id, (cascaded.get(pond.id) ?? 0) + 1);
       else singles.push(c);
     }
     return {
-      pondItems: (deletedPonds ?? []).map((p) => ({ row: p, catches: cascaded.get(p.id) ?? 0 })),
+      pondItems: (deletedPonds ?? []).filter((p) => role(p.id) === 'owner').map((p) => ({ row: p, catches: cascaded.get(p.id) ?? 0 })),
       catchItems: singles,
     };
-  }, [deletedCatches, deletedPonds, pondById]);
+  }, [deletedCatches, deletedPonds, pondById, members, viewerId]);
 
   const loading = deletedPonds === undefined || deletedCatches === undefined;
   const total = pondItems.length + catchItems.length;

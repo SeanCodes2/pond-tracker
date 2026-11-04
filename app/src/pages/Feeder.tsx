@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { PondTabs } from '../components/PondTabs';
 import { useToast } from '../components/Toast';
 import type { FeedingLogRow } from '../db/db';
 import { repo } from '../db/repo';
 import { usePond } from '../hooks/usePonds';
+import { usePondAccess } from '../hooks/useSharing';
+import { shortName } from '../lib/sharing';
 
 const DEFAULT_TIMES = ['07:00', '19:00'];
 
@@ -15,6 +18,8 @@ export function Feeder() {
   const logs = useLiveQuery(() => repo.listFeedingLogs(id), [id]);
   const toast = useToast();
   const [editing, setEditing] = useState(false);
+  const access = usePondAccess(id);
+  const readOnly = access.role === 'member';
 
   if (pond === undefined || logs === undefined) return <div className="page muted">Loading…</div>;
   if (!pond) return <div className="page empty">Pond not found.</div>;
@@ -38,16 +43,10 @@ export function Feeder() {
   return (
     <div className="page stack">
       <h1>{pond.name}</h1>
-      <div className="subtabs">
-        <Link to={`/ponds/${pond.id}`}>Dashboard</Link>
-        <Link to={`/ponds/${pond.id}/catches`}>Catches</Link>
-        <Link to={`/ponds/${pond.id}/feeder`} className="active">
-          Feeder
-        </Link>
-        <Link to={`/ponds/${pond.id}/edit`}>Edit</Link>
-      </div>
+      <PondTabs pondId={pond.id} active="feeder" />
+      {readOnly ? <div className="notice">Only {shortName(access.membership?.ownerName)} can change the feeder for this pond.</div> : null}
 
-      {editing ? (
+      {editing && !readOnly ? (
         <ScheduleForm
           initial={last}
           onCancel={() => setEditing(false)}
@@ -82,16 +81,18 @@ export function Feeder() {
               {last?.endedOn ? `Last ran ${formatDate(last.startedOn)} – ${formatDate(last.endedOn)}` : 'No feeder schedule logged for this pond yet.'}
             </div>
           )}
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn primary" style={{ flex: 1 }} onClick={() => setEditing(true)}>
-              {running ? 'Change schedule' : last ? 'Turn on' : 'Set up feeder'}
-            </button>
-            {running ? (
-              <button type="button" className="btn" style={{ flex: 1 }} onClick={() => void stop()}>
-                Turn off
+          {readOnly ? null : (
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn primary" style={{ flex: 1 }} onClick={() => setEditing(true)}>
+                {running ? 'Change schedule' : last ? 'Turn on' : 'Set up feeder'}
               </button>
-            ) : null}
-          </div>
+              {running ? (
+                <button type="button" className="btn" style={{ flex: 1 }} onClick={() => void stop()}>
+                  Turn off
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
       )}
 
@@ -100,9 +101,11 @@ export function Feeder() {
           <h3 style={{ margin: 0 }}>Hopper</h3>
           <span className="muted">{lastFill ? `last filled ${formatDate(lastFill.startedOn)}` : 'no fills logged'}</span>
         </div>
-        <button type="button" className="btn" onClick={() => void fill()}>
-          Filled it today
-        </button>
+        {readOnly ? null : (
+          <button type="button" className="btn" onClick={() => void fill()}>
+            Filled it today
+          </button>
+        )}
       </div>
 
       {logs.length ? (
@@ -110,7 +113,7 @@ export function Feeder() {
           <h2>History</h2>
           <div className="list">
             {logs.map((f) => (
-              <HistoryRow key={f.id} f={f} onDelete={() => void repo.softDeleteFeedingLog(f.id)} />
+              <HistoryRow key={f.id} f={f} onDelete={readOnly ? undefined : () => void repo.softDeleteFeedingLog(f.id)} />
             ))}
           </div>
           <div className="muted" style={{ fontSize: 14 }}>
@@ -233,7 +236,7 @@ function ScheduleForm({
   );
 }
 
-function HistoryRow({ f, onDelete }: { f: FeedingLogRow; onDelete: () => void }) {
+function HistoryRow({ f, onDelete }: { f: FeedingLogRow; onDelete?: () => void }) {
   const isFill = f.kind === 'fill';
   const title = isFill
     ? `Filled${f.lbsPerFill ? ` · ${f.lbsPerFill} lb` : ''}`
@@ -247,9 +250,11 @@ function HistoryRow({ f, onDelete }: { f: FeedingLogRow; onDelete: () => void })
         <div className="title">{title}</div>
         <div className="sub">{when}</div>
       </div>
-      <button type="button" className="btn" aria-label="Delete entry" onClick={onDelete}>
-        Delete
-      </button>
+      {onDelete ? (
+        <button type="button" className="btn" aria-label="Delete entry" onClick={onDelete}>
+          Delete
+        </button>
+      ) : null}
     </div>
   );
 }

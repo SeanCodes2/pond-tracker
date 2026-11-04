@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Catch, FeedingLog, Pond, Settings } from '@pond-tracker/shared';
+import type { Catch, FeedingLog, Pond, PondMember, Settings } from '@pond-tracker/shared';
 import { DEFAULT_SETTINGS } from '@pond-tracker/shared';
 
 /** 0 = synced, 1 = waiting to be pushed by the sync engine. Stored as a number so Dexie can index it. */
@@ -13,6 +13,9 @@ export interface SampleFlag {
 export type PondRow = Pond & { pending: Pending } & SampleFlag;
 export type CatchRow = Catch & { pending: Pending } & SampleFlag;
 export type FeedingLogRow = FeedingLog & { pending: Pending } & SampleFlag;
+
+/** Server-written; never pushed. pending is always 0. */
+export type PondMemberRow = PondMember & { pending: 0 };
 
 export interface PhotoRow {
   id: string;
@@ -46,6 +49,8 @@ export interface SyncStateRow {
   lastError?: string;
   /** Photos skipped on the last run because Wi-Fi-only upload is on and the phone is on cellular. */
   photosWaitingForWifi?: number;
+  /** This user's server id (from the last sync), used to tell your records from shared ones. */
+  viewerId?: string;
 }
 
 export class PondTrackerDB extends Dexie {
@@ -55,6 +60,7 @@ export class PondTrackerDB extends Dexie {
   photos!: EntityTable<PhotoRow, 'id'>;
   settings!: EntityTable<SettingsRow, 'id'>;
   syncState!: EntityTable<SyncStateRow, 'id'>;
+  pondMembers!: EntityTable<PondMemberRow, 'id'>;
 
   constructor(name = 'PondTrackerDB') {
     super(name);
@@ -65,6 +71,10 @@ export class PondTrackerDB extends Dexie {
       photos: 'id, catchId, pending',
       settings: 'id',
       syncState: 'id',
+    });
+    // v2: pond sharing.
+    this.version(2).stores({
+      pondMembers: 'id, pondId, memberId',
     });
   }
 }

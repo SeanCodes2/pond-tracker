@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "func start",
     "typecheck": "tsc --noEmit",
-    "clean": "rimraf dist || rm -rf dist"
+    "clean": "rimraf dist || rm -rf dist",
+    "test": "vitest run"
   },
   "dependencies": {
     "@azure/cosmos": "^4.2.0",
@@ -18,7 +19,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.8"
   },
   "engines": {
     "node": ">=20"

@@ -3,11 +3,14 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Pond } from '@pond-tracker/shared';
 import { ConfirmSheet } from '../components/ConfirmSheet';
+import { MemberPondView, SharingCard } from '../components/Sharing';
 import { useToast } from '../components/Toast';
 import { repo } from '../db/repo';
 import { clearLastPond } from '../hooks/useCurrentPond';
 import { usePond } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
+import { usePondAccess } from '../hooks/useSharing';
+import { shortName } from '../lib/sharing';
 import { getCurrentPosition } from '../lib/geo';
 
 interface Draft {
@@ -61,6 +64,7 @@ export function PondForm() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const access = usePondAccess(isNew ? undefined : id);
   const catchCount = useLiveQuery(() => (isNew || !id ? Promise.resolve(0) : repo.countCatches(id)), [id, isNew]) ?? 0;
 
   useEffect(() => {
@@ -68,6 +72,11 @@ export function PondForm() {
     if (isNew) setDraft(toDraft(undefined, { slot: settings.defaultSlot, t: settings.defaultThresholds }));
     else if (existing) setDraft(toDraft(existing, { slot: settings.defaultSlot, t: settings.defaultThresholds }));
   }, [draft, isNew, existing, settings]);
+
+  // A pond someone shared with you: details and "Leave", no editing.
+  if (!isNew && existing && access.role === 'member' && access.membership) {
+    return <MemberPondView pond={existing} membership={access.membership} />;
+  }
 
   if (!draft) return <div className="page muted">Loading…</div>;
 
@@ -151,6 +160,11 @@ export function PondForm() {
   return (
     <div className="page">
       <h1>{isNew ? 'New pond' : 'Edit pond'}</h1>
+      {!isNew && existing ? (
+        <div style={{ marginBottom: 16 }}>
+          <SharingCard pond={existing} members={access.members} />
+        </div>
+      ) : null}
       <form className="form" onSubmit={(e) => void submit(e)}>
         <div className="field">
           <label htmlFor="name">Name</label>
@@ -248,6 +262,9 @@ export function PondForm() {
       >
         This removes the pond and its {plural(catchCount, 'catch', 'catches')} from every list. You can restore them from
         Settings → Recently deleted for 30 days.
+        {access.members.length
+          ? ` It also disappears for ${access.members.map((m) => shortName(m.memberName)).join(', ')}.`
+          : ''}
       </ConfirmSheet>
     </div>
   );

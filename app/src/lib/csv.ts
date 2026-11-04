@@ -16,6 +16,7 @@ const COLUMNS = [
   'airTempF',
   'lure',
   'notes',
+  'loggedBy',
 ] as const;
 
 function cell(v: unknown): string {
@@ -45,6 +46,7 @@ export function catchesToCsv(catches: readonly Catch[], ponds: readonly Pond[]):
         c.airTempF,
         c.lure,
         c.notes,
+        c.loggedByName,
       ]
         .map(cell)
         .join(','),
