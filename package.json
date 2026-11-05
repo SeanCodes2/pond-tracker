@@ -17,6 +17,6 @@
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w app && npm run typecheck -w api"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

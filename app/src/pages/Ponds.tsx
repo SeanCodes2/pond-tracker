@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { PeopleIcon } from '../components/PondTabs';
 import { JoinPondSheet } from '../components/Sharing';
 import { db } from '../db/db';

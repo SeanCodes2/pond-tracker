@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { usePondAccess } from '../hooks/useSharing';
 import { shortName } from '../lib/sharing';
 

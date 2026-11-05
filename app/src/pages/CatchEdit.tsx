@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { Outcome, SpeciesCode } from '@pond-tracker/shared';
 import { formatWeight, relativeWeight, standardWeightLb, wrBand } from '@pond-tracker/shared';
 import { CameraIcon, PhotoInput } from '../components/PhotoInput';

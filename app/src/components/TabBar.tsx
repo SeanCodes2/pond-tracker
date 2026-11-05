@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 
 const tabs = [
   { to: '/', label: 'Log', icon: PlusIcon, end: true },

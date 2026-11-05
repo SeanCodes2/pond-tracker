@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import type { Outcome, SpeciesCode } from '@pond-tracker/shared';
 import { SPECIES, wrBand } from '@pond-tracker/shared';
 import { ConfirmSheet } from '../components/ConfirmSheet';

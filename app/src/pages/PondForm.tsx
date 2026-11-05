@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import type { Pond } from '@pond-tracker/shared';
 import { ConfirmSheet } from '../components/ConfirmSheet';
 import { MemberPondView, SharingCard } from '../components/Sharing';

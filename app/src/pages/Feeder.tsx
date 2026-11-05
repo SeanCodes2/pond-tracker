@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { PondTabs } from '../components/PondTabs';
 import { useToast } from '../components/Toast';
 import type { FeedingLogRow } from '../db/db';

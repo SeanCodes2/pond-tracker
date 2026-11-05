@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { PondMemberRow, PondRow } from '../db/db';
 import { clearLastPond } from '../hooks/useCurrentPond';
 import { ShareError, createInvite, formatCode, joinPond, leavePond, removeMember, shortName } from '../lib/sharing';

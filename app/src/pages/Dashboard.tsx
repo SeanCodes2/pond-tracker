@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import type { SpeciesCode, WrThresholds } from '@pond-tracker/shared';
 import { SPECIES, lengthFrequency, pondGuidance, psd, wrBand, wrByClass } from '@pond-tracker/shared';
 import { ENABLED_SPECIES } from '../components/SpeciesPicker';

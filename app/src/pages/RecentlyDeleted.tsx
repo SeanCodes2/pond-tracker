@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ConfirmSheet } from '../components/ConfirmSheet';
 import { useToast } from '../components/Toast';
 import { db, type CatchRow, type PondRow } from '../db/db';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import type { Outcome, SpeciesCode } from '@pond-tracker/shared';
 import { cullHint, formatWeight, relativeWeight, standardWeightLb, wrBand } from '@pond-tracker/shared';
 import { CameraIcon, PhotoInput } from '../components/PhotoInput';

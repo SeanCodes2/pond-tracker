@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { Settings, WeightUnits } from '@pond-tracker/shared';
 import { useToast } from '../components/Toast';
 import { repo } from '../db/repo';
