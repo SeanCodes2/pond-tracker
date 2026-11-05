@@ -180,12 +180,15 @@ async function route(store: DocStore, viewer: Viewer, access: Access, doc: SyncD
 export interface ApplyResult {
   applied: number;
   rejected: RejectedChange[];
+  /** What was written and where, for follow-up work like weather lookups. */
+  written: { doc: SyncDoc; partition: string }[];
 }
 
 /** Writes pushed changes with last-writer-wins on updatedAt, enforcing sharing permissions. */
 export async function applyChanges(store: DocStore, viewer: Viewer, access: Access, changes: SyncDoc[], now: Now): Promise<ApplyResult> {
   let applied = 0;
   const rejected: RejectedChange[] = [];
+  const written: ApplyResult['written'] = [];
   for (const incoming of changes) {
     const r = await route(store, viewer, access, incoming);
     if ('reject' in r) {
@@ -202,10 +205,12 @@ export async function applyChanges(store: DocStore, viewer: Viewer, access: Acce
     if (existing && existing.updatedAt >= incoming.updatedAt) continue; // server copy is newer or equal
     // serverUpdatedAt is the server's own clock and is what pulls are keyed on, so a device with a
     // skewed clock can't hide its changes from other devices.
-    await store.upsert({ ...incoming, ...r.extra, userId: r.partition, serverUpdatedAt: now().toISOString() });
+    const doc = { ...incoming, ...r.extra, userId: r.partition, serverUpdatedAt: now().toISOString() };
+    await store.upsert(doc);
+    written.push({ doc, partition: r.partition });
     applied++;
   }
-  return { applied, rejected };
+  return { applied, rejected, written };
 }
 
 // ---------------------------------------------------------------------------------------------

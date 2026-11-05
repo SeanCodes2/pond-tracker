@@ -10,7 +10,7 @@ import { db, type PhotoRow, type PondTrackerDB, type SyncStateRow, type SyncStat
 
 export type SyncDocType = 'pond' | 'catch' | 'feedingLog' | 'settings' | 'photo';
 /** Doc types the server sends but the app never pushes. */
-export type ServerDocType = 'pondMember';
+export type ServerDocType = 'pondMember' | 'catchWeather';
 
 /** Wire shape; mirrors api/src/types.ts (kept local so the app doesn't import the API). */
 export interface SyncDoc {
@@ -64,7 +64,7 @@ const BATCH_SIZE = 200;
 const LOCAL_ONLY = ['pending', 'sample', 'blob'] as const;
 const SERVER_ONLY = ['type', 'userId', 'serverUpdatedAt'] as const;
 
-type RecordTable = 'ponds' | 'catches' | 'feedingLogs' | 'settings' | 'photos' | 'pondMembers';
+type RecordTable = 'ponds' | 'catches' | 'feedingLogs' | 'settings' | 'photos' | 'pondMembers' | 'catchWeather';
 const TABLE_FOR: Record<SyncDocType | ServerDocType, RecordTable> = {
   pond: 'ponds',
   catch: 'catches',
@@ -72,6 +72,7 @@ const TABLE_FOR: Record<SyncDocType | ServerDocType, RecordTable> = {
   settings: 'settings',
   photo: 'photos',
   pondMember: 'pondMembers',
+  catchWeather: 'catchWeather',
 };
 
 /** A row we pushed, with the updatedAt we pushed, so pending is cleared only if it hasn't changed since. */
@@ -144,6 +145,7 @@ export async function dropSharedPond(database: PondTrackerDB, pondId: string): P
   await database.catches.where('pondId').equals(pondId).delete();
   await database.feedingLogs.where('pondId').equals(pondId).delete();
   await database.pondMembers.where('pondId').equals(pondId).delete();
+  await database.catchWeather.where('pondId').equals(pondId).delete();
   await database.ponds.delete(pondId);
 }
 

@@ -112,3 +112,16 @@ How it's stored (Cosmos, partition key `/userId`):
 - Photos stay in the uploader's blob folder; `GET /api/photos/{id}` serves one only to its owner, the pond's owner, or a member of that pond.
 
 Rules live in `api/src/sharing.ts` (tests in `api/src/__tests__/sharing.test.ts`).
+
+## Weather and moon
+
+Each catch shows the conditions when it was caught (catch page, CSV export, and the **Conditions** card on the pond dashboard).
+
+- **Weather** (air temperature, sea-level pressure and its 3-hour trend, wind, clouds) is looked up by the API during sync from [Open-Meteo](https://open-meteo.com) (free, no key, non-commercial use) for the pond's GPS location at the catch time. Catches from the last 60 days use the forecast API; older ones use the ERA5 archive. Nothing is fetched by the phone, so the app's CSP is unchanged; the only thing sent to Open-Meteo is the pond's coordinates and dates.
+- It's stored as its own server-written record per catch (`catchWeather`, id `wx_<catchId>`, same partition and `pondId` as the catch), so it never conflicts with edits to the catch. Shared ponds get it like any other pond record.
+- Each sync fills in weather for the catches it just received and backfills up to 150 older catches in your partition, in at most 3 calls with a 4-second timeout. A failed lookup is retried on a later sync; "no data" is recorded and retried after a week. Changing a catch's time, or the pond's location, triggers a new lookup.
+- Ponds without GPS get no weather. Add a location on the pond's Edit page and it backfills on the next sync.
+- A typed-in air temperature always wins over the looked-up one.
+- **Moon phase** is calculated on the phone from the catch time (within about half a day), so it works for every catch.
+
+Code: `api/src/weather.ts` (tests in `api/src/__tests__/weather.test.ts`), `shared/src/weather.ts`, `app/src/lib/conditions.ts`.

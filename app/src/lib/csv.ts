@@ -1,4 +1,4 @@
-import type { Catch, Pond } from '@pond-tracker/shared';
+import { moonPhase, type Catch, type CatchWeather, type Pond } from '@pond-tracker/shared';
 
 const COLUMNS = [
   'id',
@@ -14,6 +14,14 @@ const COLUMNS = [
   'lon',
   'waterTempF',
   'airTempF',
+  'pressureInHg',
+  'pressureChange3hInHg',
+  'pressureTrend',
+  'windMph',
+  'windDirDeg',
+  'cloudPct',
+  'moonPhase',
+  'moonIllumination',
   'lure',
   'notes',
   'loggedBy',
@@ -25,10 +33,21 @@ function cell(v: unknown): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function catchesToCsv(catches: readonly Catch[], ponds: readonly Pond[]): string {
+/**
+ * airTempF is what was typed in, falling back to the looked-up air temperature. Weather columns
+ * are blank until the server has filled them in.
+ */
+export function catchesToCsv(
+  catches: readonly Catch[],
+  ponds: readonly Pond[],
+  weather: ReadonlyMap<string, Pick<CatchWeather, 'status' | 'caughtAt' | 'airTempF' | 'pressureInHg' | 'pressureChange3hInHg' | 'pressureTrend' | 'windMph' | 'windDirDeg' | 'cloudPct'>> = new Map(),
+): string {
   const pondName = new Map(ponds.map((p) => [p.id, p.name]));
   const lines = [COLUMNS.join(',')];
   for (const c of catches) {
+    const raw = weather.get(c.id);
+    const w = raw?.status === 'ok' && raw.caughtAt === c.caughtAt ? raw : undefined;
+    const moon = moonPhase(c.caughtAt);
     lines.push(
       [
         c.id,
@@ -43,7 +62,15 @@ export function catchesToCsv(catches: readonly Catch[], ponds: readonly Pond[]):
         c.lat,
         c.lon,
         c.waterTempF,
-        c.airTempF,
+        c.airTempF ?? w?.airTempF,
+        w?.pressureInHg,
+        w?.pressureChange3hInHg,
+        w?.pressureTrend,
+        w?.windMph,
+        w?.windDirDeg,
+        w?.cloudPct,
+        moon.name,
+        Math.round(moon.illumination * 100) / 100,
         c.lure,
         c.notes,
         c.loggedByName,

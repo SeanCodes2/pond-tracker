@@ -1663,3 +1663,40 @@ select:disabled {
   align-items: baseline;
   gap: 12px;
 }
+
+/* ---------- Catch weather ---------- */
+
+.weather-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px 16px;
+}
+
+.weather-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.weather-label {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.weather-value {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.weather-note {
+  margin-top: 8px;
+  font-size: 14px;
+}

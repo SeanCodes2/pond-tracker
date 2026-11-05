@@ -38,7 +38,8 @@ export function SettingsPage() {
   const exportCsv = async () => {
     const pondId = exportPond === 'all' ? undefined : exportPond;
     const rows = await repo.listCatches(pondId);
-    const csv = catchesToCsv(rows, ponds ?? []);
+    const weather = await db.catchWeather.toArray();
+    const csv = catchesToCsv(rows, ponds ?? [], new Map(weather.map((w) => [w.catchId, w])));
     const name = exportPond === 'all' ? 'all-ponds' : (ponds?.find((p) => p.id === exportPond)?.name ?? 'pond');
     downloadBlob(new Blob([csv], { type: 'text/csv' }), `pond-tracker-${slug(name)}-${new Date().toISOString().slice(0, 10)}.csv`);
     toast.show({ message: `Exported ${rows.length} catches` });

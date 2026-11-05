@@ -5,3 +5,4 @@ export * from './types.js';
 export * from './species.js';
 export * from './wr.js';
 export * from './population.js';
+export * from './weather.js';

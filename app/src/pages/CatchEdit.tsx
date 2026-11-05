@@ -12,6 +12,8 @@ import { usePhotoUrl } from '../hooks/usePhotoUrl';
 import { usePond, usePonds } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
 import { usePondAccess, useSharing } from '../hooks/useSharing';
+import { useCatchWeather } from '../hooks/useWeather';
+import { WeatherCard } from '../components/WeatherCard';
 import { roleFor, shortName } from '../lib/sharing';
 import { fromLocalInput, toLocalInput } from '../lib/format';
 import { shareCatchPhoto } from '../lib/sharePhoto';
@@ -41,6 +43,7 @@ export function CatchEdit() {
   const pond = usePond(row?.pondId);
   const photoUrl = usePhotoUrl(row?.photoId);
   const access = usePondAccess(row?.pondId);
+  const weather = useCatchWeather(row?.id);
   const { viewerId, members } = useSharing();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -223,6 +226,11 @@ export function CatchEdit() {
             <label htmlFor="when">Caught at</label>
             <input id="when" type="datetime-local" value={draft.caughtAt} onChange={set('caughtAt')} style={{ minHeight: 48, fontSize: 18, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', padding: '8px 12px' }} />
           </div>
+          <WeatherCard
+            caughtAt={row.caughtAt}
+            weather={weather}
+            hasLocation={(row.lat !== undefined && row.lon !== undefined) || pond?.lat !== undefined}
+          />
           <div className="field-grid">
             <div className="field">
               <label htmlFor="water">Water °F</label>
@@ -230,7 +238,14 @@ export function CatchEdit() {
             </div>
             <div className="field">
               <label htmlFor="air">Air °F</label>
-              <input id="air" type="number" inputMode="decimal" value={draft.airTempF} onChange={set('airTempF')} />
+              <input
+                id="air"
+                type="number"
+                inputMode="decimal"
+                value={draft.airTempF}
+                onChange={set('airTempF')}
+                placeholder={weather?.status === 'ok' && weather.airTempF !== undefined ? `${Math.round(weather.airTempF)} (auto)` : undefined}
+              />
             </div>
           </div>
           <div className="field">

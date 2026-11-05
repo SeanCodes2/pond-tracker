@@ -140,6 +140,37 @@ describe('shared ponds on the phone', () => {
     expect(await db.ponds.get(mine.id)).toBeDefined();
   });
 
+  it('stores weather records from the server and drops them with the shared pond', async () => {
+    const server = scriptedServer();
+    const { db, engine } = await device(server.fetchImpl);
+    const wx: SyncDoc = {
+      id: 'wx_C-owner',
+      type: 'catchWeather',
+      catchId: 'C-owner',
+      pondId: 'P1',
+      status: 'ok',
+      caughtAt: '2026-05-01T00:00:00.000Z',
+      lat: 38.8,
+      lon: -94.9,
+      airTempF: 61.2,
+      pressureInHg: 30.01,
+      pressureTrend: 'falling',
+      source: 'open-meteo',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+      userId: OWNER,
+    };
+    server.queue({ serverChanges: [sharedPond, membership(), ownerCatch, wx] });
+    await engine.syncNow();
+    expect(await db.catchWeather.where('catchId').equals('C-owner').first()).toMatchObject({ airTempF: 61.2, pressureTrend: 'falling' });
+    // The weather record is never pushed back.
+    await engine.syncNow();
+    expect(server.pushed.flat().some((d) => d.type === 'catchWeather')).toBe(false);
+
+    server.queue({ serverChanges: [membership({ deletedAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-06-02T00:00:00.000Z' })] });
+    await engine.syncNow();
+    expect(await db.catchWeather.count()).toBe(0);
+  });
+
   it('works with a server that predates sharing (no viewerId / rejected)', async () => {
     const fetchImpl: FetchLike = async () => new Response(JSON.stringify({ serverChanges: [], serverTime: '2026-06-01T00:00:00.000Z' }), { status: 200 });
     const { engine } = await device(fetchImpl);

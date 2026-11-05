@@ -443,17 +443,19 @@ export function createRepo(database: PondTrackerDB) {
   /** Permanently removes catches and their photos. */
   async function hardDeleteCatches(ids: string[]): Promise<number> {
     if (ids.length === 0) return 0;
-    return database.transaction('rw', database.catches, database.photos, async () => {
+    return database.transaction('rw', database.catches, database.photos, database.catchWeather, async () => {
       await database.photos.where('catchId').anyOf(ids).delete();
+      await database.catchWeather.where('catchId').anyOf(ids).delete();
       return database.catches.where('id').anyOf(ids).delete();
     });
   }
 
   /** Permanently removes a pond with every catch (and photo) and feeding log that belongs to it. */
   async function hardDeletePond(pondId: string): Promise<{ catches: number; feedingLogs: number }> {
-    return database.transaction('rw', database.ponds, database.catches, database.photos, database.feedingLogs, async () => {
+    return database.transaction('rw', database.ponds, database.catches, database.photos, database.feedingLogs, database.catchWeather, async () => {
       const catchIds = await database.catches.where('pondId').equals(pondId).primaryKeys();
       if (catchIds.length) await database.photos.where('catchId').anyOf(catchIds).delete();
+      await database.catchWeather.where('pondId').equals(pondId).delete();
       const catches = await database.catches.where('pondId').equals(pondId).delete();
       const feedingLogs = await database.feedingLogs.where('pondId').equals(pondId).delete();
       await database.ponds.delete(pondId);
@@ -465,7 +467,7 @@ export function createRepo(database: PondTrackerDB) {
   async function purgeDeleted(olderThanDays = 30): Promise<{ ponds: number; catches: number; feedingLogs: number }> {
     const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString();
     const old = (r: { deletedAt?: string }) => !!r.deletedAt && r.deletedAt < cutoff;
-    return database.transaction('rw', database.ponds, database.catches, database.photos, database.feedingLogs, async () => {
+    return database.transaction('rw', database.ponds, database.catches, database.photos, database.feedingLogs, database.catchWeather, async () => {
       const pondIds = await database.ponds.filter(old).primaryKeys();
       let catches = 0;
       let feedingLogs = 0;

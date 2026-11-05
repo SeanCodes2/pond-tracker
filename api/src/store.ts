@@ -8,6 +8,7 @@
 import type { Container } from '@azure/cosmos';
 import { getDocsContainer } from './cosmos';
 import type { PondInviteDoc, PondMemberDoc, SyncDoc } from './types';
+import type { WeatherStamp } from './weather';
 
 export interface DocStore {
   read(id: string, partition: string): Promise<SyncDoc | undefined>;
@@ -23,6 +24,8 @@ export interface DocStore {
   photosForCatches(ownerId: string, catchIds: string[]): Promise<SyncDoc[]>;
   /** An invite by code. Cross-partition. */
   findInvite(code: string): Promise<PondInviteDoc | undefined>;
+  /** What the weather backfill needs from one partition: live catches, ponds, and existing weather stamps. */
+  weatherScan(partition: string): Promise<{ catches: SyncDoc[]; ponds: SyncDoc[]; weather: WeatherStamp[] }>;
 }
 
 export function createCosmosStore(container: Container): DocStore {
@@ -84,7 +87,7 @@ export function createCosmosStore(container: Container): DocStore {
 
     pondChanges(ownerId, pondId, since) {
       const base =
-        "SELECT * FROM c WHERE c.userId = @o AND ((c.type = 'pond' AND c.id = @pond) OR (c.pondId = @pond AND c.type IN ('catch', 'feedingLog', 'photo')))";
+        "SELECT * FROM c WHERE c.userId = @o AND ((c.type = 'pond' AND c.id = @pond) OR (c.pondId = @pond AND c.type IN ('catch', 'feedingLog', 'photo', 'catchWeather')))";
       const parameters = [
         { name: '@o', value: ownerId },
         { name: '@pond', value: pondId },
@@ -109,6 +112,32 @@ export function createCosmosStore(container: Container): DocStore {
         },
         ownerId,
       );
+    },
+
+    async weatherScan(partition) {
+      const params = [{ name: '@p', value: partition }];
+      const [catches, ponds, weather] = await Promise.all([
+        query<SyncDoc>(
+          {
+            query:
+              "SELECT c.id, c.type, c.userId, c.pondId, c.caughtAt, c.lat, c.lon, c.updatedAt FROM c WHERE c.userId = @p AND c.type = 'catch' AND NOT IS_DEFINED(c.deletedAt) ORDER BY c.caughtAt DESC",
+            parameters: params,
+          },
+          partition,
+        ),
+        query<SyncDoc>(
+          { query: "SELECT c.id, c.type, c.userId, c.lat, c.lon, c.updatedAt FROM c WHERE c.userId = @p AND c.type = 'pond'", parameters: params },
+          partition,
+        ),
+        query<WeatherStamp>(
+          {
+            query: "SELECT c.catchId, c.caughtAt, c.lat, c.lon, c.status, c.updatedAt FROM c WHERE c.userId = @p AND c.type = 'catchWeather'",
+            parameters: params,
+          },
+          partition,
+        ),
+      ]);
+      return { catches, ponds, weather };
     },
 
     async findInvite(code) {

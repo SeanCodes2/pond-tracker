@@ -1,5 +1,6 @@
 import type { DocStore } from '../store';
 import type { PondInviteDoc, PondMemberDoc, SyncDoc } from '../types';
+import type { WeatherStamp } from '../weather';
 
 /** In-memory DocStore with the same semantics as the Cosmos queries in store.ts. */
 export function createMemoryStore() {
@@ -32,11 +33,23 @@ export function createMemoryStore() {
     async pondChanges(ownerId, pondId, since) {
       return all()
         .filter((d) => d.userId === ownerId)
-        .filter((d) => (d.type === 'pond' && d.id === pondId) || (d['pondId'] === pondId && ['catch', 'feedingLog', 'photo'].includes(d.type)))
+        .filter(
+          (d) =>
+            (d.type === 'pond' && d.id === pondId) ||
+            (d['pondId'] === pondId && ['catch', 'feedingLog', 'photo', 'catchWeather'].includes(d.type)),
+        )
         .filter(after(since));
     },
     async photosForCatches(ownerId, catchIds) {
       return all().filter((d) => d.userId === ownerId && d.type === 'photo' && catchIds.includes(String(d['catchId'])));
+    },
+    async weatherScan(partition) {
+      const mine = all().filter((d) => d.userId === partition);
+      return {
+        catches: mine.filter((d) => d.type === 'catch' && !d.deletedAt).sort((a, b) => String(b['caughtAt']).localeCompare(String(a['caughtAt']))),
+        ponds: mine.filter((d) => d.type === 'pond'),
+        weather: mine.filter((d) => d.type === 'catchWeather') as unknown as WeatherStamp[],
+      };
     },
     async findInvite(code) {
       return all().find((d) => d.type === 'pondInvite' && d['code'] === code) as PondInviteDoc | undefined;

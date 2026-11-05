@@ -166,7 +166,7 @@ describe('a member of a shared pond', () => {
     await share();
     const since = clock.peek();
     const res = await push(BUDDY, [fish('C-buddy', 'P1', undefined, { loggedBy: OWNER.userId })]);
-    expect(res).toEqual({ applied: 1, rejected: [] });
+    expect(res).toMatchObject({ applied: 1, rejected: [] });
     expect(mem.get('C-buddy', BUDDY.userId)).toBeUndefined();
     expect(mem.get('C-buddy', OWNER.userId)).toMatchObject({ loggedBy: BUDDY.userId, loggedByName: BUDDY.name });
     // The owner sees it on their next pull, and so does the buddy's other phone.

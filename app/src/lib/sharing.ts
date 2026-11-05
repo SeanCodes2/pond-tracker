@@ -93,7 +93,7 @@ export function removeMember(pondId: string, memberId: string): Promise<{ ok: tr
 /** Leaves on the server, then clears the pond off this phone right away. */
 export async function leavePond(pondId: string, database: PondTrackerDB = db): Promise<void> {
   await post('/api/shares/leave', { pondId });
-  await database.transaction('rw', [database.ponds, database.catches, database.feedingLogs, database.photos, database.pondMembers], () =>
+  await database.transaction('rw', [database.ponds, database.catches, database.feedingLogs, database.photos, database.pondMembers, database.catchWeather], () =>
     dropSharedPond(database, pondId),
   );
 }

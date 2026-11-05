@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Catch, FeedingLog, Pond, PondMember, Settings } from '@pond-tracker/shared';
+import type { Catch, CatchWeather, FeedingLog, Pond, PondMember, Settings } from '@pond-tracker/shared';
 import { DEFAULT_SETTINGS } from '@pond-tracker/shared';
 
 /** 0 = synced, 1 = waiting to be pushed by the sync engine. Stored as a number so Dexie can index it. */
@@ -16,6 +16,9 @@ export type FeedingLogRow = FeedingLog & { pending: Pending } & SampleFlag;
 
 /** Server-written; never pushed. pending is always 0. */
 export type PondMemberRow = PondMember & { pending: 0 };
+
+/** Server-written weather for a catch; never pushed. */
+export type CatchWeatherRow = CatchWeather & { pending: 0 };
 
 export interface PhotoRow {
   id: string;
@@ -61,6 +64,7 @@ export class PondTrackerDB extends Dexie {
   settings!: EntityTable<SettingsRow, 'id'>;
   syncState!: EntityTable<SyncStateRow, 'id'>;
   pondMembers!: EntityTable<PondMemberRow, 'id'>;
+  catchWeather!: EntityTable<CatchWeatherRow, 'id'>;
 
   constructor(name = 'PondTrackerDB') {
     super(name);
@@ -75,6 +79,10 @@ export class PondTrackerDB extends Dexie {
     // v2: pond sharing.
     this.version(2).stores({
       pondMembers: 'id, pondId, memberId',
+    });
+    // v3: weather looked up by the server for each catch.
+    this.version(3).stores({
+      catchWeather: 'id, catchId, pondId',
     });
   }
 }

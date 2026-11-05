@@ -11,7 +11,7 @@ export type SyncDocType = 'pond' | 'catch' | 'feedingLog' | 'settings' | 'photo'
  *    partition (userId = owner) so the owner's normal pull includes the member list.
  *  - pondInvite: a one-time join code. Lives in the owner's partition and is never pulled.
  */
-export type ServerDocType = 'pondMember' | 'pondInvite';
+export type ServerDocType = 'pondMember' | 'pondInvite' | 'catchWeather';
 export type AnyDocType = SyncDocType | ServerDocType;
 
 export const SYNC_DOC_TYPES: readonly SyncDocType[] = [

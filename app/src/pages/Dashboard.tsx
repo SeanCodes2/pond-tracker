@@ -9,10 +9,12 @@ import { Histogram } from '../components/charts/Histogram';
 import { LineChart, type LineSeries } from '../components/charts/LineChart';
 import { PsdMeter } from '../components/charts/PsdMeter';
 import { PondTabs } from '../components/PondTabs';
-import type { CatchRow, FeedingLogRow, PondRow } from '../db/db';
+import type { CatchRow, CatchWeatherRow, FeedingLogRow, PondRow } from '../db/db';
 import { repo } from '../db/repo';
 import { usePond } from '../hooks/usePonds';
 import { useSettings } from '../hooks/useSettings';
+import { useWeatherByCatch } from '../hooks/useWeather';
+import { byAirTemp, byMoon, byPressureTrend, currentWeather, type ConditionBucket } from '../lib/conditions';
 
 /** Minimum catches per species before pondGuidance gives real advice. */
 const GUIDANCE_MIN_N = 30;
@@ -36,6 +38,7 @@ export function Dashboard() {
   const settings = useSettings();
   const catches = useLiveQuery(() => repo.listCatches(id), [id]);
   const feedingLogs = useLiveQuery(() => repo.listFeedingLogs(id), [id]);
+  const weather = useWeatherByCatch();
 
   if (pond === undefined || catches === undefined) return <div className="page muted">Loading…</div>;
   if (!pond) return <div className="page empty">Pond not found.</div>;
@@ -138,6 +141,8 @@ export function Dashboard() {
             <WrByMonthChart catches={catches.filter((c) => c.caughtAt >= seasonStart)} species={present} feedingLogs={feedingLogs ?? []} year={year} thresholds={thresholds} />
           </div>
         ) : null}
+
+        {present.length ? <ConditionsCard catches={catches} weather={weather} pond={pond} thresholds={thresholds} /> : null}
 
         {present.length ? (
           <div className="card">
@@ -383,6 +388,82 @@ function Stat({ v, l }: { v: number | string; l: string }) {
     <div className="stat">
       <div className="stat-v">{v}</div>
       <div className="stat-l">{l}</div>
+    </div>
+  );
+}
+
+/** Need this many catches with weather before the weather charts mean anything. */
+const CONDITIONS_MIN_N = 10;
+
+function ConditionsCard({
+  catches,
+  weather,
+  pond,
+  thresholds,
+}: {
+  catches: CatchRow[];
+  weather: ReadonlyMap<string, CatchWeatherRow>;
+  pond: PondRow;
+  thresholds: WrThresholds;
+}) {
+  // Bass are what the weather question is about; fall back to everything if there are none.
+  const bass = catches.filter((c) => c.speciesId === 'LMB');
+  const subject = bass.length ? bass : catches;
+  const who = bass.length ? 'bass' : 'fish';
+  const withWeather = subject.filter((c) => currentWeather(c, weather)).length;
+  const enough = withWeather >= CONDITIONS_MIN_N;
+
+  return (
+    <div className="card">
+      <h3>Conditions</h3>
+      <div className="muted chart-caption">
+        When your {who} were caught. Bar = number of {who}; under each bar, their average Wr.
+      </div>
+      <Explain>
+        <p>
+          Weather (air temperature, pressure, wind, clouds) is looked up for the pond’s GPS location at the time of each
+          catch. <b>Pressure trend</b> is the change over the 3 hours before the catch: about 0.03 inHg (1 hPa) or more
+          counts as rising or falling.
+        </p>
+        <p>
+          <b>Careful reading these:</b> the app only knows when you caught fish, not when you fished and caught nothing. If
+          most of your bass came on falling pressure, that may just be when you go fishing. The average Wr under each bar
+          doesn’t have that problem.
+        </p>
+        <p>The moon is worked out from the date, so it works for every catch, with or without weather.</p>
+      </Explain>
+
+      {pond.lat === undefined && withWeather === 0 ? (
+        <div className="notice">Add GPS to this pond (Edit tab) to get the weather for its catches.</div>
+      ) : !enough ? (
+        <div className="notice">
+          Weather charts appear once {CONDITIONS_MIN_N} {who} have weather ({withWeather} so far). It fills in on sync.
+        </div>
+      ) : (
+        <>
+          <ConditionChart title="Pressure trend" buckets={byPressureTrend(subject, weather)} thresholds={thresholds} who={who} />
+          <ConditionChart title="Air temperature (°F)" buckets={byAirTemp(subject, weather)} thresholds={thresholds} who={who} />
+        </>
+      )}
+      <ConditionChart title="Moon" buckets={byMoon(subject)} thresholds={thresholds} who={who} />
+    </div>
+  );
+}
+
+function ConditionChart({ title, buckets, thresholds, who }: { title: string; buckets: ConditionBucket[]; thresholds: WrThresholds; who: string }) {
+  return (
+    <div className="chart-block">
+      <h4>{title}</h4>
+      <BarChart
+        ariaLabel={`Number of ${who} caught by ${title.toLowerCase()}`}
+        categories={buckets.map((b) => ({
+          label: b.label,
+          value: b.count,
+          sub: b.meanWr === null ? '' : `Wr ${Math.round(b.meanWr)}`,
+          colorClass: b.meanWr === null ? undefined : wrBand(b.meanWr, thresholds),
+          title: `${b.count} ${who}${b.meanWr === null ? '' : `, average Wr ${Math.round(b.meanWr)}`}`,
+        }))}
+      />
     </div>
   );
 }

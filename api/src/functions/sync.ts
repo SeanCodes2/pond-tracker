@@ -3,6 +3,7 @@ import { getUser } from '../auth';
 import { HttpError, json, toErrorResponse } from '../http';
 import { applyChanges, fetchChanges, loadAccess } from '../sharing';
 import { getStore } from '../store';
+import { enrichWeather } from '../weather';
 import { isIsoDate, isSyncDocType, type SyncDoc, type SyncRequest, type SyncResponse } from '../types';
 
 const MAX_CHANGES = 500;
@@ -44,8 +45,21 @@ async function syncHandler(req: HttpRequest, context: InvocationContext): Promis
     const store = getStore();
     const viewer = { userId: user.userId, name: user.name };
     const access = await loadAccess(store, user.userId);
-    const { applied, rejected } = await applyChanges(store, viewer, access, changes, () => new Date());
-    context.info(`sync: user=${user.userId} received=${changes.length} applied=${applied} rejected=${rejected.length} shared=${access.shared.size}`);
+    const { applied, rejected, written } = await applyChanges(store, viewer, access, changes, () => new Date());
+    // Weather is best-effort: a failure here must never fail the sync.
+    let weather = 0;
+    try {
+      weather = await enrichWeather(store, user.userId, written, {
+        fetch: (url, init) => fetch(url, init),
+        now: () => new Date(),
+        log: (m) => context.warn(m),
+      });
+    } catch (e) {
+      context.warn(`weather: skipped (${String((e as Error)?.message ?? e)})`);
+    }
+    context.info(
+      `sync: user=${user.userId} received=${changes.length} applied=${applied} rejected=${rejected.length} shared=${access.shared.size} weather=${weather}`,
+    );
     const serverChanges = await fetchChanges(store, viewer, access, since);
     const body: SyncResponse = { serverChanges, serverTime, viewerId: user.userId, rejected };
     return json(body);
